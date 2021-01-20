@@ -1,0 +1,261 @@
+; Early reflections program.
+; Uses a 3x3 FDN for scattering and 6x multi-tap delays for left and right.
+; Pre-delay is variable on each side, and may be smoothly modulated for special effects.
+
+; Variation: Medium sized space
+
+; Controls:
+; Pot 0: Decay time of scattering and taps.
+; Pot 1: Pre-delay time for left side.
+; Pot 2: Pre-delay time for right side.
+
+; Memory declarations
+
+  MEM pre_del_left   4095
+  MEM pre_del_right  4095
+
+  MEM lap  2047
+  MEM rap  2047
+
+  MEM del1  4095
+  MEM del2  4095
+  MEM del3  4095
+
+; Constants
+
+  EQU smooth 0.001         ; Pot low pass smoothing filter
+
+  EQU	k1_1kHz	0.174549
+  EQU	k1_2kHz	0.318630
+  EQU	k1_4kHz	0.535735
+  EQU	k1_8kHz 0.784458
+  EQU	k1_12kHz 0.899931
+  EQU	lp_bandwidth	k1_12kHz	; Coeff for input low-pass
+
+  EQU	lfo0_rate	33
+  EQU	lfo1_rate	21
+
+  EQU pre_delay_4096 1.0
+  EQU pre_delay_2048 0.5
+  EQU pre_delay_1024 0.25
+  EQU	pre_delay_mult pre_delay_2048  ; Scale pre delay range
+
+  EQU input_gain    0.5
+  EQU tap_gain     -0.75
+  EQU make_up_gain -1.73
+
+; Delay sizes (for medium sized space)
+
+  EQU dl1 1727
+  EQU dl2 656
+  EQU dl3 1067
+
+; Diffusers
+
+  EQU ap1  625
+  EQU ap2  612
+
+  EQU ap_k1  0.25
+  EQU ap_k2  0.25
+
+; Tap times
+
+  EQU t01  173
+  EQU t02  347
+  EQU t03  521
+  EQU t04  691
+  EQU t05  857
+  EQU t06  1031
+  EQU t07  1201
+  EQU t08  1367
+  EQU t09  1543
+  EQU t10  1709
+  EQU t11  1879
+  EQU t12  2047
+
+; FDN Feedback coefficients, as 3x3 matrix
+
+  EQU k00  0.57735
+  EQU k01  0.70711
+  EQU k02  0.40825
+  EQU k10 -0.57735
+  EQU k11  0.0
+  EQU k12  0.81650
+  EQU k20  0.57735
+  EQU k21 -0.70711
+  EQU k22  0.40825
+
+; Registers and intermediate nodes
+
+  EQU pkfil            reg1  ;  Limiter state
+  EQU gain             reg2  ;  Output gain from limiter
+  EQU n_lp_input_left  reg3  ;  Low-passed input left channel
+  EQU n_lp_input_right reg4  ;  Low-passed input right channel
+  EQU scaled_pot0      reg5  ;  Left pre-delay control
+  EQU scaled_pot1      reg6  ;  Right pre-delay control
+  EQU decay_coef       reg7  ;  Decay coefficient from pot2
+  EQU rt               reg8
+  EQU lpf1  reg9
+  EQU lpf2  reg10
+  EQU lpf3  reg11
+
+; Init program
+
+  SKP	run, loop
+  WLDR rmp0, 0, 4096        ; Ramp for servo pre-delay left
+  WLDR rmp1, 0, 4096        ; Ramp for servo pre-delay right
+  WLDS sin0, lfo0_rate, 50  ; LFO for delay modulation
+  WLDS sin1, lfo1_rate, 50  ; LFO for delay modulation
+
+loop:
+
+; Calculate rt (reverb time) and decay_coef from pot0.
+; Coefficient will be negative so that alternate taps will alternate polarity
+
+  LDAX pot0
+  SOF 0.4, 0.1
+  WRAX rt, 0.0
+  RDAX pot0, 1.0
+  SOF -0.5, -0.1
+  WRAX decay_coef, 0.0
+
+; Servo control rmp0 set by pot0
+  RDAX pot1, pre_delay_mult ; Load pot0
+  MULX pot1                 ; Square it, for more resolution on shorter pre-delays
+  RDFX scaled_pot0, smooth  ; Low pass smooth it
+  WRAX scaled_pot0, 0.0     ; Save scaled pot, clear ACC
+  CHO RDAL, rmp0            ; Read current pointer
+  RDAX scaled_pot0, -0.5    ; Subtract pot for servo control of pointer
+  WRAX rmp0_rate, 0.0       ; Maintain pointer in register and clear ACC
+
+; Servo control rmp1 set by pot1
+  RDAX pot2, pre_delay_mult ; Load pot1
+  MULX pot2                 ; Square it, for more resolution on shorter pre-delays
+  RDFX scaled_pot1, smooth  ; Low pass smooth it
+  WRAX scaled_pot1, 0.0     ; Save scaled pot, clear ACC
+  CHO RDAL, rmp1            ; Read current pointer
+  RDAX scaled_pot1, -0.5    ; Subtract pot for servo control of pointer
+  WRAX rmp1_rate, 0.0       ; Maintain pointer in register and clear ACC
+
+; Simple peak limiter gain calculation
+  RDAX adcl, 0.5
+  RDAX adcr, 0.5
+  MAXX pkfil, 0.99998  ; Compare with pkfil*.999 (abs)
+  WRAX pkfil, 1        ; Write peak value back
+  LOG -1, -0.125	     ; -12dB threshold
+  EXP 1,0	             ; 1/x
+  MULX 0.5             ; Scale down further for taps gain
+  WRAX gain, 0.0       ; Output factor is in "gain" register
+
+; Left input to pre-delay
+  RDAX adcl, 1.0                      ; Read ADC
+  WRA  pre_del_left, 0.0              ; Write to pre-delay, clear ACC
+
+; Read left pre-delay and low pass it
+  CHO RDA, rmp0, REG | COMPC, pre_del_left
+  CHO RDA, rmp0, 0, pre_del_left + 1  ; Interpolated left pre-delay output
+  MULX gain                           ; Scale by limiter gain
+  RDFX n_lp_input_left, lp_bandwidth  ; Low-pass
+  WRAX n_lp_input_left, 0.0
+
+; Right input to pre-delay
+  RDAX adcr, 1.0                      ; Read ADC
+  WRA  pre_del_right, 0.0             ; Write to pre-delay, clear ACC
+
+; Read right pre-delay and low pass it
+  CHO RDA, rmp1, REG | COMPC, pre_del_right
+  CHO RDA, rmp1, 0, pre_del_right + 1 ; Interpolated right pre-delay output
+  MULX gain                           ; Scale by limiter gain
+  RDFX n_lp_input_right, lp_bandwidth ; Low-pass
+  WRAX n_lp_input_right, 0.0
+
+; Do the FDN
+; Inject left to del1, right to del3 and a mix to del2
+; Leave headroom for the feedback
+
+  RDA del1 + dl1, k00
+  RDA del2 + dl2, k01
+  RDA del3 + dl3, k02
+  MULX rt
+  RDFX lpf1, k1_1kHz ; Low-pass
+  WRAX lpf1, 1.0
+  RDAX n_lp_input_left, input_gain
+  WRA del1, 0.0
+
+  RDA del1 + dl1, k10
+  ; Zero in matrix
+  RDA del3 + dl3, k12
+  MULX rt
+  RDFX lpf2, k1_1kHz ; Low-pass
+  WRAX lpf2, 1.0
+  RDAX n_lp_input_left, input_gain * 0.5
+  RDAX n_lp_input_right, input_gain * 0.5
+  WRA del2, 0.0
+
+  RDA del1 + dl1, k20
+  RDA del2 + dl2, k21
+  RDA del3 + dl3, k22
+  MULX rt
+  RDFX lpf3, k1_1kHz ; Low-pass
+  WRAX lpf3, 1.0
+  RDAX n_lp_input_right, input_gain
+  WRA del3, 0.0
+
+; Left output taps
+; After each tap, the accumulation is scaled down by the decay_coef,
+; which causes those taps to scale down exponentially.
+; We start with the later taps, which are "further away" and then work back towards the first.
+
+  RDA del1 + t12, tap_gain
+  MULX decay_coef
+  RDA del1 + t10, tap_gain
+  MULX decay_coef
+  RDA del1 + t08, tap_gain
+  MULX decay_coef
+  RDA del1 + t06, tap_gain
+  MULX decay_coef
+
+; Apply an all pass diffuser here to the furthest taps, to smear them a bit
+
+  RDA  lap + ap1, -ap_k2
+  WRAP lap, ap_k1
+
+; Add the last two taps
+
+  RDA del1 + t04, tap_gain
+  MULX decay_coef
+  RDA del1 + t02, tap_gain
+
+; Scale some make-up gain, and write to the dac
+
+  SOF make_up_gain, 0.0
+  SOF make_up_gain, 0.0
+  WRAX dacl, 0.0
+
+; Right output taps, same as left side above
+
+  RDA del3 + t11, tap_gain
+  MULX decay_coef
+  RDA del3 + t09, tap_gain
+  MULX decay_coef
+  RDA del3 + t07, tap_gain
+  MULX decay_coef
+  RDA del3 + t05, tap_gain
+  MULX decay_coef
+
+; All-pass diffusion
+
+  RDA  rap + ap2, -ap_k2
+  WRAP rap, ap_k2
+
+; Last two taps
+
+  RDA del3 + t03, tap_gain
+  MULX decay_coef
+  RDA del3 + t01, tap_gain
+
+; Scale some make-up gain, and write to the dac
+
+  SOF make_up_gain, 0.0
+  SOF make_up_gain, 0.0
+  WRAX dacr, 0.0

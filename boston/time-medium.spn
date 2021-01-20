@@ -1,0 +1,256 @@
+; FDN-style stereo reverb with 8x8 matrix.
+; Left and right energy is injected and tapped so that it maintains
+; the input's stereo image, but still cross-couples the feedback.
+
+; Variation: Time (Medium)
+; The time of a left and right delay are modulated independently.
+; This creates increasingly diffused echoes when delay times are long.
+; Also, there is an envelope detector on the input and feedback,
+; which reduces the rt when it detects signal at input or runaway feedback.
+
+; Controls:
+; Pot 0: Reverb decay time
+; Pot 1: Delay time, left tap
+; Pot 2: Delay time, right tap
+
+; 8 delay lines for FDN
+
+  MEM del1  1023
+  MEM del2  1023
+  MEM del3  1023
+  MEM del4  13311
+  MEM del5  1023
+  MEM del6  1023
+  MEM del7  1023
+  MEM del8  13311
+
+; Fixed delay lengths
+
+  EQU dl1  173
+  EQU dl2  691
+  EQU dl3  857
+
+  EQU dl5  347
+  EQU dl6  521
+  EQU dl7  931
+
+; Lots of low pass filters
+
+  EQU lpf1  reg3
+  EQU lpf2  reg4
+  EQU lpf3  reg5
+  EQU lpf4  reg6
+  EQU lpf5  reg7
+  EQU lpf6  reg8
+  EQU lpf7  reg9
+  EQU lpf8  reg10
+
+; Precalculated feedback sub-matrix temporary registers
+
+  EQU a00  reg11
+  EQU a01  reg12
+  EQU a10  reg13
+  EQU a11  reg14
+  EQU a20  reg15
+  EQU a21  reg16
+  EQU a30  reg17
+  EQU a31  reg18
+
+  EQU rt  reg19         ; Overall reverb time, set by pot
+  EQU scaled_pot1 reg21 ;
+  EQU scaled_pot2 reg22 ;
+
+  EQU sigin reg30
+  EQU avg   reg31
+
+; Constants
+
+  EQU k      0.35355   ; Unity gain matrix scaling factor for 8x8 Hadamard
+
+  EQU	k1_1kHz	0.174549
+  EQU	k1_2kHz	0.318630
+  EQU	k1_4kHz	0.535735
+  EQU	k1_8kHz 0.784458
+  EQU	k1_12kHz 0.899931
+  EQU smooth 0.001
+
+  EQU input_gain     0.25    ;
+  EQU make_up_gain  -1.783   ;
+
+  EQU full_scale 32767 * 256 ; 0x7FFF00
+
+; No init, no lfos
+
+loop:
+
+; Set rt decay by pot 0
+
+  LDAX pot0
+  LOG	0.333, 0
+  EXP	1, 0
+  WRAX rt, 0.0
+
+; Delay 4 tap time set by pot 1
+
+  RDAX pot1, 1.0            ; Load pot1
+  SOF 0.20, 0.1             ; Scale to a range inside del4
+  RDFX scaled_pot1, smooth  ; Smooth it
+  WRAX scaled_pot1, 0.0
+
+; Delay 8 tap time set by pot2
+
+  RDAX pot2, 1.0            ; Load pot2
+  SOF 0.20, 0.6             ; Scale to a range inside del8
+  RDFX scaled_pot2, smooth  ; Smooth it
+  WRAX scaled_pot2, 0.0
+
+; Reduce the rt value by an envelope detector on the input
+; This causes the old to fall away faster to be replaced by the new
+
+  RDAX  adcl, 1.0     ; Add up all the inputs with some of the feedback
+  RDAX  adcr, 1.0
+  RDA   del4#, 0.125  ; It's OK if this saturates
+  RDA   del8#, 0.125
+
+  WRAX	sigin, 1.0	  ; Track mono signal
+  MULX  sigin
+  LOG	  0.5, 0        ; Exponential shape
+  EXP	  1, 0
+  RDFX	avg, 0.01	    ; Smooth it a little
+  WRAX	avg, 1.0		  ; Store average
+
+  SOF	 -1.0, 0.999    ;
+  SOF   0.5, 0.5      ; Scale the rt multiplier to 0.5 - 1
+  MULX  rt            ; Reduce rt by input envelope
+  WRAX  rt, 0.0
+
+; Variable read of del4 tap set by pot1
+
+  OR   full_scale
+  MULX scaled_pot1
+  WRAX addr_ptr, 0
+  RMPA 1.0
+  RDFX lpf4, k1_8kHz  ; Low pass the feedback
+  WRAX lpf4, 0.0
+
+; Variable read of del8 tap set by pot1
+
+  OR   full_scale
+  MULX scaled_pot2
+  WRAX addr_ptr, 0
+  RMPA 1.0
+  RDFX lpf8, k1_8kHz  ; Low pass the feedback
+  WRAX lpf8, 0.0
+
+; Calculate the eight individual sub-matrices
+
+  RDA  del1 + dl1, k     ; Read four delay lines and mult by matrix coeffs
+  RDA  del2 + dl2, k
+  RDA  del3 + dl3, k
+  RDAX lpf4, k
+  WRAX a00, 0.0
+
+  RDA  del5 + dl5, k
+  RDA  del6 + dl6, k
+  RDA  del7 + dl7, k
+  RDAX lpf8, k
+  WRAX a01, 0.0
+
+  RDA  del1 + dl1, k
+  RDA  del2 + dl2, -k
+  RDA  del3 + dl3, k
+  RDAX lpf4, -k
+  WRAX a10, 0.0
+
+  RDA  del5 + dl5, k
+  RDA  del6 + dl6, -k
+  RDA  del7 + dl7, k
+  RDAX lpf8, -k
+  WRAX a11, 0.0
+
+  RDA  del1 + dl1, k
+  RDA  del2 + dl2, k
+  RDA  del3 + dl3, -k
+  RDAX lpf4, -k
+  WRAX a20, 0.0
+
+  RDA  del5 + dl5, k
+  RDA  del6 + dl6, k
+  RDA  del7 + dl7, -k
+  RDAX lpf8, -k
+  WRAX a21, 0.0
+
+  RDA  del1 + dl1, k
+  RDA  del2 + dl2, -k
+  RDA  del3 + dl3, -k
+  RDAX lpf4, k
+  WRAX a30, 0.0
+
+  RDA  del5 + dl5, k
+  RDA  del6 + dl6, -k
+  RDA  del7 + dl7, -k
+  RDAX lpf8, k
+  WRAX a31, 0.0
+
+; Now do the main FDN
+;
+; The left input is injected to 1-4 and the right to 5-6.
+; The two sides are roughly balanced.
+
+  RDAX a00, 1.0          ; Precalculated first 1x4 of the feedback matrix
+  RDAX a01, 1.0          ; Second 1x4
+  MULX rt                ; Scale by overall reverb decay time
+  RDAX adcl, input_gain  ; Add left input
+  WRA  del1, 0.0         ; Write to the delay line
+
+  RDAX a10, 1.0
+  RDAX a11, 1.0
+  MULX rt
+  WRA  del2, 0.0
+
+  RDAX a20, 1.0
+  RDAX a21, 1.0
+  MULX rt
+  WRA del3, 0.0
+
+  RDAX a30, 1.0
+  RDAX a31, 1.0
+  MULX rt
+  RDAX adcl, input_gain
+  WRA del4, 0.0
+
+  RDAX a00, 1.0
+  RDAX a01, -1.0
+  MULX rt
+  RDAX adcr, input_gain
+  WRA  del5, 0.0
+
+  RDAX a10, 1.0
+  RDAX a11, -1.0
+  MULX rt
+  WRA  del6, 0.0
+
+  RDAX a20, 1.0
+  RDAX a21, -1.0
+  MULX rt
+  WRA  del7, 0.0
+
+  RDAX a30, 1.0
+  RDAX a31, -1.0
+  MULX rt
+  RDAX adcr, input_gain
+  WRA  del8, 0.0
+
+; Left output with gain to restore output level
+
+  RDAX lpf4, 1.0
+  SOF  make_up_gain, 0
+  SOF  make_up_gain, 0
+  WRAX dacl, 0.0
+
+; Right output with gain to restore output level
+
+  RDAX lpf8, 1.0
+  SOF  make_up_gain, 0
+  SOF  make_up_gain, 0
+  WRAX dacr, 0.0

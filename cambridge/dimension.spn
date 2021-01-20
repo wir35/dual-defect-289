@@ -1,0 +1,154 @@
+; Stereo chorus dimensional expander
+;
+; Input signals are each split by a crossover and the low end and high end are
+; effected by two different choruses.
+; The outputs are recombined with polarity-reversed dry signals from the opposite
+; channels for extra-wide low end depth.
+; The pot 0 control adds an additional 0-30ms of delay to the right channel,
+; which can be used to make the sound much wider. Also, this control can be
+; smoothly modulated by an external LFO as a sort of manual chorus.
+
+; Controls
+; Pot 0: Left/right delay offset, up to ~30ms
+; Pot 1: Modulation speed
+; Pot 2: Modulation depth
+
+; Chorus delay memory
+
+  MEM del_left_low  1024
+  MEM del_left_hi   1024
+  MEM del_right_off 4096
+  MEM del_right_low 1024
+  MEM del_right_hi  1024
+
+  EQU pre_delay_mult 0.25  ; We only want up to about 1024 samples of offset
+  EQU smooth  0.001        ; Pot low pass smoothing filter
+  EQU input_gain 1.0       ; Gain applied to adc input
+
+  EQU crossover 0.013
+  EQU lsvf1     reg3
+  EQU lsvf2     reg4
+  EQU rsvf1     reg5
+  EQU rsvf2     reg6
+  EQU lxover_low reg7
+  EQU lxover_hi  reg8
+  EQU rxover_low reg9
+  EQU rxover_hi  reg10
+
+  EQU scaled_pot0   reg11  ;  Smoother for pot0
+  EQU scaled_pot1   reg12  ;  Smoother for pot1
+  EQU scaled_pot2   reg13  ;  Smoother for pot2
+
+; Init program
+
+  SKP	run, loop
+  WLDR rmp0, 0, 4096  ; Ramp for servo pre-delay right
+  WLDS sin0, 10, 50   ; LFO for low chorus
+  WLDS sin1, 10, 50   ; LFO for hi chorus
+  CLR
+
+loop:
+
+; Servo control rmp0 set by pot0
+
+  RDAX pot0, pre_delay_mult ; Load pot0
+  MULX pot0                 ; Square it, for more resolution on shorter pre-delays
+  RDFX scaled_pot0, smooth  ; Low pass smooth it
+  WRAX scaled_pot0, 0.0     ; Save scaled pot, clear ACC
+  CHO RDAL, rmp0            ; Read current pointer
+  RDAX scaled_pot0, -0.5    ; Subtract pot for servo control of pointer
+  WRAX rmp0_rate, 0.0       ; Maintain pointer in register and clear ACC
+
+; Modulation speed set by pot1
+
+  RDAX pot1, 1.0            ; Load pot1
+  RDFX scaled_pot1, smooth  ; Low pass smooth it
+  WRAX scaled_pot1, 1.0     ; Store
+  SOF 0.5, 0.05             ; Scale
+  WRAX SIN1_RATE, 0.127     ; Write sin0 rate
+  WRAX SIN0_RATE, 0.0       ; Write sin1 rate slightly off
+
+; Modulation depth set by pot2
+
+  RDAX pot2, 1.0            ; Load pot2
+  RDFX scaled_pot2, smooth  ; Low pass smooth it
+  WRAX scaled_pot2, 0.01    ; Store and scale
+  WRAX SIN0_RANGE, 1.0
+  WRAX SIN1_RANGE, 0.0
+
+; Left input and simple crossover
+; Using HP and LP outputs of a biquad state-variable filter
+
+  RDAX lsvf1, crossover
+  RDAX lsvf2,  1.0
+  WRAX lxover_low, 1.0
+  WRAX lsvf2, -1.0
+  RDAX lsvf1, -1.0
+  RDAX adcl, input_gain      ; Read left input
+  WRAX lxover_hi, crossover
+  RDAX lsvf1,  1.0
+  WRAX lsvf1,  0.0
+
+; Write xover outputs to chorus delays
+
+  RDAX lxover_low, 1.0
+  WRA  del_left_low, 0.0
+  RDAX lxover_hi, 1.0
+  WRA  del_left_hi, 0.0
+
+; Right input and short pre-delay
+; Allows offsetting right channel from the left
+
+  RDAX adcr, input_gain
+  WRA del_right_off, 0.0
+
+; Right cross over
+
+  RDAX rsvf1, crossover
+  RDAX rsvf2,  1.0
+  WRAX rxover_low, 1.0
+  WRAX rsvf2, -1.0
+  RDAX rsvf1, -1.0
+
+  ; Servo read from the pre-delay using rmp0
+  CHO RDA, rmp0, REG | COMPC, del_right_off
+  CHO RDA, rmp0, 0, del_right_off + 1
+
+  WRAX rxover_hi, crossover
+  RDAX rsvf1,  1.0
+  WRAX rsvf1,  0.0
+
+; Write xover outputs to chorus delays
+
+  RDAX rxover_low, 1.0
+  WRA  del_right_low, 0.0
+  RDAX rxover_hi, 1.0
+  WRA  del_right_hi, 0.0
+
+; Accumulate chorused delays for left output
+
+  CHO RDA, sin0, SIN | REG | COMPC, del_left_low^ - 1
+  CHO RDA, sin0, 0, del_left_low^
+
+  CHO RDA, sin1, SIN | REG | COMPC, del_left_hi^ - 1
+  CHO RDA, sin1, 0, del_left_hi^
+
+  SOF -1, 0            ; Invert phase
+  RDA rxover_low, 1.0  ; Bass boost
+  SOF -1, 0            ; Invert phase again
+  WRAX dacl, 0.0
+
+; Accumulate chorused delays for right output
+
+  CHO RDA, sin0, COS | REG | COMPC, del_right_low^ - 1
+  CHO RDA, sin0, 0, del_right_low^
+
+  CHO RDA, sin1, COS | REG | COMPC, del_right_hi^ - 1
+  CHO RDA, sin1, 0, del_right_hi^
+
+  SOF -1, 0            ; Invert phase
+  RDA lxover_low, 1.0  ; Bass boost
+  SOF -1, 0            ; Invert phase again
+  WRAX dacr, 0.0
+
+; Done

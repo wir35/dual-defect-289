@@ -1,0 +1,97 @@
+; Stereo delay program
+; 500ms max delay split between both sides.
+
+; There is no digital feedback in this program.
+; Use analog feedback, to either side.
+; Low pass filter on both inputs.
+; Unity gain through the delay line.
+; The two taps can be modulated, but the read is not interpolated so it is noisy.
+
+; Controls:
+; Pot 0: Left tap time
+; Pot 1: Right tap time
+; Pot 2: Low pass filter cutoff
+
+; Split the memory into two delay lines
+
+  MEM del1 16383
+  MEM del2 16383
+
+; Constants
+
+  EQU smooth       0.001       ; Pot 0 and 1 low pass smoothing filter
+  EQU full_scale   32767 * 256 ; 0x7FFF00
+  EQU make_up_gain -1.414      ; 2x
+  EQU input_gain    0.5
+
+; Registers and intermediate nodes
+
+  EQU scaled_pot0      reg1  ;  Left pre-delay control
+  EQU scaled_pot1      reg2  ;  Right pre-delay control
+  EQU scaled_pot2      reg3  ;  Right pre-delay control
+  EQU lpf1             reg4  ;  Left input low pass
+  EQU lpf2             reg5  ;  Right input low pass
+
+; Init program
+
+  SKP	run, loop
+  WLDR rmp0, 0, 4096        ; Ramp for servo pre-delay left
+  WLDR rmp1, 0, 4096        ; Ramp for servo pre-delay right
+
+loop:
+
+; Left tap time set by pot0
+  LDAX pot0                 ; Load pot0
+  SOF 0.498, 0.001          ; Scale and shift it to del1
+  RDFX scaled_pot0, smooth  ; Low pass smooth it
+  WRAX scaled_pot0, 0.0     ; Save scaled pot, clear ACC
+
+; Right tap time by pot1
+  LDAX pot1                 ; Load pot1
+  SOF 0.498, 0.501          ; Scale and shift it to del2
+  RDFX scaled_pot1, smooth  ; Low pass smooth it
+  WRAX scaled_pot1, 0.0     ; Save scaled pot, clear ACC
+
+; LPF freq set by pot2
+  RDAX pot2, 1.0            ; Load pot2
+  MULX pot2                 ; Square it
+  SOF 0.5, 0.0              ; Scale
+  WRAX scaled_pot2, 0.0     ; Save it, clear ACC
+
+; Left input with low pass filter
+
+  RDAX adcl, input_gain     ; Read right input
+  RDAX lpf1, -1.0
+  MULX scaled_pot2          ; Sweep lpf cutoff by pot2
+  RDAX lpf1, 1.0
+  WRAX lpf1, 1.0            ; Lpf done
+  WRA  del1, 0.0            ; Write to del1
+
+; Right input with low pass filter
+
+  RDAX adcr, input_gain     ; Read right input
+  RDAX lpf2, -1.0
+  MULX scaled_pot2          ; Sweep lpf cutoff by pot2
+  RDAX lpf2, 1.0
+  WRAX lpf2, 1.0            ; Lpf done
+  WRA  del2, 0.0            ; Write to del2
+
+; Left output, delay tap time swept by pot 0
+
+  OR   full_scale          ; Load ACC with 0x7FFF00
+  MULX scaled_pot0         ; Scale by the smoothed pot0 value
+  WRAX addr_ptr, 0         ; Set addr_ptr register for tap time
+	RMPA 1.0                 ; Read delay memory
+  SOF make_up_gain, 0.0    ; Scale for make-up gain
+  SOF make_up_gain, 0.0
+  WRAX dacl, 0.0           ; Write to dac left output
+
+; Right output, delay tap time swept by pot 1
+
+  OR   full_scale
+  MULX scaled_pot1
+  WRAX addr_ptr, 0
+  RMPA 1.0
+  SOF make_up_gain, 0.0
+  SOF make_up_gain, 0.0
+  WRAX dacr, 0.0

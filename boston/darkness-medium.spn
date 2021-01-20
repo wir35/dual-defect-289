@@ -1,0 +1,235 @@
+; FDN-style stereo reverb with 8x8 matrix.
+; Left and right energy is injected and tapped so that it maintains
+; the input's stereo image, but still cross-couples the feedback.
+
+; Variation: Darkness (medium sized space)
+; The low pass filter on the feedback paths can be modulated
+
+; Controls:
+; Pot 0: Reverb decay time
+; Pot 1: Not connected
+; Pot 2: Feedback low pass filter
+
+; 8 delay lines for FDN
+
+  MEM del1  4095
+  MEM del2  4095
+  MEM del3  4095
+  MEM del4  4095
+  MEM del5  4095
+  MEM del6  4095
+  MEM del7  4095
+  MEM del8  4095
+
+; Delay lengths
+; Adjust to change size of space
+; We use this convention, as it's an easy template to follow for all programs.
+
+  EQU dl1   1136
+  EQU dl2   2055
+  EQU dl3   2390
+  EQU dl4   2642
+  EQU dl5   1392
+  EQU dl6   1837
+  EQU dl7   2323
+  EQU dl8   2903
+
+; Lots of low pass filters
+
+  EQU lpf1  reg3
+  EQU lpf2  reg4
+  EQU lpf3  reg5
+  EQU lpf4  reg6
+  EQU lpf5  reg7
+  EQU lpf6  reg8
+  EQU lpf7  reg9
+  EQU lpf8  reg10
+
+; Precalculated feedback sub-matrix temporary registers
+
+  EQU a00  reg11
+  EQU a01  reg12
+  EQU a10  reg13
+  EQU a11  reg14
+  EQU a20  reg15
+  EQU a21  reg16
+  EQU a30  reg17
+  EQU a31  reg18
+
+  EQU rt     reg19   ; Overall reverb time, set by pot
+  EQU cutoff reg20   ; Cutoff frequency for lpfs in feedback
+
+; Constants
+
+  EQU k  0.35355         ; Unity gain matrix scaling factor for 8x8 Hadamard
+  EQU input_gain    0.25 ; Scale down input to leave headroom for the matrix
+  EQU make_up_gain  2.0
+
+; No init before loop
+
+loop:
+
+; Set rt decay by pot 0 and shape it
+
+  LDAX pot0
+  LOG	0.5, 0
+  EXP	0.9, 0
+  WRAX rt, 0.0
+
+; Pot 1 unused
+
+; Set lpf in feedback by pot 2
+
+  LDAX pot2
+  MULX pot2
+  SOF 0.6, 0.2
+  WRAX cutoff, 0.0
+
+; Calculate the eight individual feedback sub-matrices.
+
+  RDA  del1 + dl1, k     ; Read four delay lines and mult by matrix coeffs
+  RDA  del2 + dl2, k
+  RDA  del3 + dl3, k
+  RDA  del4 + dl4, k
+  WRAX a00, 0.0
+
+  RDA  del5 + dl5, k
+  RDA  del6 + dl6, k
+  RDA  del7 + dl7, k
+  RDA  del8 + dl8, k
+  WRAX a01, 0.0
+
+  RDA  del1 + dl1, k
+  RDA  del2 + dl2, -k
+  RDA  del3 + dl3, k
+  RDA  del4 + dl4, -k
+  WRAX a10, 0.0
+
+  RDA  del5 + dl5, k
+  RDA  del6 + dl6, -k
+  RDA  del7 + dl7, k
+  RDA  del8 + dl8, -k
+  WRAX a11, 0.0
+
+  RDA  del1 + dl1, k
+  RDA  del2 + dl2, k
+  RDA  del3 + dl3, -k
+  RDA  del4 + dl4, -k
+  WRAX a20, 0.0
+
+  RDA  del5 + dl5, k
+  RDA  del6 + dl6, k
+  RDA  del7 + dl7, -k
+  RDA  del8 + dl8, -k
+  WRAX a21, 0.0
+
+  RDA  del1 + dl1, k
+  RDA  del2 + dl2, -k
+  RDA  del3 + dl3, -k
+  RDA  del4 + dl4, k
+  WRAX a30, 0.0
+
+  RDA  del5 + dl5, k
+  RDA  del6 + dl6, -k
+  RDA  del7 + dl7, -k
+  RDA  del8 + dl8, k
+  WRAX a31, 0.0
+
+; Now do the main FDN:
+; We just combine the two appropriate intermediate registers,
+; add in the input signal and then do the low pass filter.
+; The left input is injected to 1-4 and the right to 5-6.
+
+  RDAX a00, 1.0          ; Precalculated first 1x4 of the feedback matrix
+  RDAX a01, 1.0          ; Second 1x4
+  MULX rt                ; Scale by overall reverb decay time
+  RDAX adcl, input_gain  ; Add in raw signal from left ADC, scaled down
+  RDAX lpf1, -1.0        ; Do the low pass filter
+  MULX cutoff            ; Make the LPF cutoff sweepable
+  RDAX lpf1, 1.0
+  WRAX lpf1, 1.0         ; LPF done
+  WRA  del1, 0.0         ; Write to the delay line
+
+  RDAX a10, 1.0
+  RDAX a11, 1.0
+  MULX rt
+  RDAX adcl, input_gain
+  RDAX lpf2, -1.0
+  MULX cutoff
+  RDAX lpf2, 1.0
+  WRAX lpf2, 1.0
+  WRA  del2, 0.0
+
+  RDAX a20, 1.0
+  RDAX a21, 1.0
+  MULX rt
+  RDAX adcl, input_gain
+  RDAX lpf3, -1.0
+  MULX cutoff
+  RDAX lpf3, 1.0
+  WRAX lpf3, 1.0
+  WRA del3, 0.0
+
+  RDAX a30, 1.0
+  RDAX a31, 1.0
+  MULX rt
+  RDAX adcl, input_gain
+  RDAX lpf4, -1.0
+  MULX pot2
+  RDAX lpf4, 1.0
+  WRAX lpf4, 1.0
+  WRA del4, 0.0
+
+  RDAX a00, 1.0
+  RDAX a01, -1.0
+  MULX rt
+  RDAX adcr, input_gain
+  RDAX lpf5, -1.0
+  MULX cutoff
+  RDAX lpf5, 1.0
+  WRAX lpf5, 1.0
+  WRA  del5, 0.0
+
+  RDAX a10, 1.0
+  RDAX a11, -1.0
+  MULX rt
+  RDAX adcr, input_gain
+  RDAX lpf6, -1.0
+  MULX cutoff
+  RDAX lpf6, 1.0
+  WRAX lpf6, 1.0
+  WRA  del6, 0.0
+
+  RDAX a20, 1.0
+  RDAX a21, -1.0
+  MULX rt
+  RDAX adcr, input_gain
+  RDAX lpf7, -1.0
+  MULX cutoff
+  RDAX lpf7, 1.0
+  WRAX lpf7, 1.0
+  WRA  del7, 0.0
+
+  RDAX a30, 1.0
+  RDAX a31, -1.0
+  MULX rt
+  RDAX adcr, input_gain
+  RDAX lpf8, -1.0
+  MULX cutoff
+  RDAX lpf8, 1.0
+  WRAX lpf8, 1.0
+  WRA  del8, 0.0
+
+; Left output with gain to restore output level
+
+  RDA  del3 + 614, -1.5
+  RDA  del4 + 1712, -0.5
+  SOF  -make_up_gain, 0
+  WRAX dacl, 0.0
+
+; Right output with gain to restore output level
+
+  RDA  del7 + 491, -1.5
+  RDA  del8 + 1954, -0.5
+  SOF  -make_up_gain, 0
+  WRAX dacr, 0.0
