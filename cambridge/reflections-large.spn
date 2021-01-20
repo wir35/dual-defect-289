@@ -1,5 +1,6 @@
 ; Early reflections program.
 ; Uses a 3x3 FDN for scattering and 6x multi-tap delays for left and right.
+; Pre-delay is variable on each side, and may be smoothly modulated for special effects.
 
 ; Variation: Large sized space
 

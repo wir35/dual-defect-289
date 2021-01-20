@@ -1,7 +1,5 @@
 ; Long delay program
 ; Summed mono input with separately adjustable left and right taps.
-; It is kind of like a Lexicon Prime Time II.
-
 ; This variation adds randomized chorus to the delay line.
 
 ; There is no digital feedback in this program.
