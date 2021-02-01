@@ -85,8 +85,8 @@
 ; Init
 
   SKP run, loop
-  WLDS sin0, 17, 130
-  WLDS sin1, 24, 90
+  WLDS sin0, 17, 97
+  WLDS sin1, 24, 55
 
 loop:
 
@@ -101,7 +101,7 @@ loop:
 ; Nominally 0.375 - 0.500
 
   RDAX pot1, 1.0            ; Load pot1
-  SOF 0.19, 0.38          ; Scale to a range inside del4
+  SOF 0.19, 0.38            ; Scale to a range inside del4
   WRAX scaled_pot1, 0.0
 
 ; Set feedback output level by pot2
@@ -217,7 +217,7 @@ loop:
   RDAX mix_in, 1.0
   WRA  del8, 0.0
 
-; Modulate delays del1-3 and del5-7 for more diffusion
+; Modulate delays del1-2 and del5-6 for more diffusion
 
   CHO RDA, sin1, 0x06, del1 + 500
   CHO	RDA, sin1, 0,    del1 + 501
@@ -227,10 +227,6 @@ loop:
   CHO	RDA, sin0, 1,    del2 + 501
   WRA del2 + 700, 0
 
-  CHO RDA, sin1, 0x06, del3 + 500
-  CHO	RDA, sin1, 0,    del3 + 501
-  WRA del3 + 700, 0
-
   CHO RDA, sin1, 0x06, del5 + 500
   CHO	RDA, sin1, 0,    del5 + 501
   WRA del5 + 700, 0
@@ -239,9 +235,6 @@ loop:
   CHO	RDA, sin0, 1,    del6 + 501
   WRA del6 + 700, 0
 
-  CHO RDA, sin1, 0x06, del7 + 500
-  CHO	RDA, sin1, 0,    del7 + 501
-  WRA del7 + 700, 0
 
 ; Left output (reverb out) from del4 with gain to restore output level
 
@@ -259,7 +252,9 @@ loop:
 
 ; Right output (feedback out) with gain to restore output level
 
+  RDA  del3#, 1.0
+  RDA  del4#, 1.0
+  RDA  del7#, 1.0
   RDA  del8#, 1.0
-  MULX fb_out_gain
   MULX fb_out_gain
   WRAX dacr, 0.0
