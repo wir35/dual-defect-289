@@ -1,0 +1,34 @@
+; A way to generate random sin lfos
+
+; Init program
+
+  SKP	run, loop
+  WLDS sin0, 200, 16384     ; LFO rates will be randomized
+  WLDS sin1, 200, 16384     ;
+  WLDR rmp0, 4123, 4096     ; Ramp for "random" value to be sampled
+
+loop:
+
+; Alternately update LFO 0 and 1 rates
+  CHO  RDAL, sin0
+  SKP  GEZ,  update_lfo1
+
+update_lfo0:
+  CLR
+  CHO  RDAL, rmp0
+  RDAX SIN0_RATE, 0.01
+  WRAX SIN0_RATE, 0.0
+
+update_lfo1:
+  CLR
+  CHO  RDAL, rmp0
+  RDAX SIN1_RATE, 0.01
+  WRAX SIN1_RATE, 0.0
+
+; Output the lfos for testing/view on scope
+
+  CHO RDAL, sin0
+  WRAX dacl, 0.0
+
+  CHO RDAL, sin1
+  WRAX dacr, 0.0

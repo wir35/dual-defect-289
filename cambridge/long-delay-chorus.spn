@@ -13,13 +13,16 @@
 ; Pot 1: Right tap time
 ; Pot 2: Chorus depth
 
-; Use all the delay memory for one delay line
+; Memory declarations
 
-  MEM del1 32767
+  MEM del1 30719    ; Main delay mem
+  MEM mod_l 1023    ; Modulation left
+  MEM mod_r 1023    ; Modulation right
 
 ; Constants
 
-  EQU smooth       0.001       ; Pot 0 and 1 low pass smoothing filter
+  EQU delay_size   0.875       ; Delay size factor
+  EQU smooth       0.005       ; Pot 0 and 1 low pass smoothing filter
   EQU full_scale   32767 * 256 ; 0x7FFF00
   EQU make_up_gain -1.414      ; 2x
   EQU input_gain   0.5
@@ -28,32 +31,33 @@
 
   EQU scaled_pot0      reg1  ;  Left pre-delay control
   EQU scaled_pot1      reg2  ;  Right pre-delay control
-  EQU scaled_pot2      reg3  ;  Right pre-delay control
-  EQU lpf              reg4  ;  Input low pass
+  EQU scaled_pot2      reg3  ;  Chorus depth
 
 ; Init program
 
   SKP	run, loop
-  WLDS sin0, 1, 240        ; LFO rates are randomized
-  WLDS sin1, 1, 240        ;
-  WLDR rmp0, 0, 4096       ; Ramp for servo pre-delay left
-  WLDR rmp1, 0, 4096       ; Ramp for servo pre-delay right
+  WLDS sin0, 200, 16384     ; LFO rates will be randomized
+  WLDS sin1, 200, 16384     ;
+  WLDR rmp0, 4123, 4096     ; Ramp for "random" value to be sampled
+  CLR
 
 loop:
 
 ; Left tap time set by pot0
-  LDAX pot0                 ; Load pot0
+  RDAX pot0, delay_size     ; Load pot0
   RDFX scaled_pot0, smooth  ; Low pass smooth it
   WRAX scaled_pot0, 0.0     ; Save scaled pot, clear ACC
 
 ; Right tap time by pot1
-  RDAX pot1, 1.0            ; Load pot1
+  RDAX pot1, delay_size     ; Load pot1
   RDFX scaled_pot1, smooth  ; Low pass smooth it
   WRAX scaled_pot1, 0.0     ; Save scaled pot, clear ACC
 
 ; Chorus depth set by pot2
   RDAX pot2, 1.0
-  SOF 0.008, 0.0
+  MULX pot2                 ; Cubic shape it
+  MULX pot2
+  SOF	 0.01, 0              ; Scale down to a reasonable range
   WRAX SIN0_RANGE, 1.0
   WRAX SIN1_RANGE, 0.0
 
@@ -63,25 +67,26 @@ loop:
   RDAX adcr, input_gain
   WRA del1, 0.0
 
-; Add chorus at two points in the delay line
-
-  CHO RDA, sin0, 0x06, 700
-  CHO	RDA, sin0, 0,    701
-  WRA 1100, 0
-
-  CHO RDA, sin1, 0x06, 15700
-  CHO	RDA, sin1, 1,    15701
-  WRA 16100, 0
-
 ; Left output, delay tap time swept by pot 0
 
   OR   full_scale          ; Load ACC with 0x7FFF00
   MULX scaled_pot0         ; Scale by the smoothed pot0 value
   WRAX addr_ptr, 0         ; Set addr_ptr register for tap time
-	RMPA 1.0                 ; Read delay memory
-  SOF make_up_gain, 0.0    ; Scale for make-up gain
-  SOF make_up_gain, 0.0
-  WRAX dacl, 0.0           ; Write to dac left output
+  RMPA 1.0                 ; Read delay memory
+  WRA  mod_l, 0            ; Write to modulation buffer
+
+; Left chorus
+
+  CHO RDA, sin0, SIN | REG | COMPC, mod_l + 300
+  CHO	RDA, sin0, 0, mod_l + 301
+  WRA mod_l + 700, 0.0
+
+; Left output to dac from end of modulation buffer
+
+  RDA  mod_l#, 1.0
+  SOF  make_up_gain, 0.0    ; Scale for make-up gain
+  SOF  make_up_gain, 0.0
+  WRAX dacl, 0.0            ; Write to dac left output
 
 ; Right output, delay tap time swept by pot 1
 
@@ -89,23 +94,33 @@ loop:
   MULX scaled_pot1
   WRAX addr_ptr, 0
   RMPA 1.0
-  SOF make_up_gain, 0.0
-  SOF make_up_gain, 0.0
+  WRA  mod_r, 0
+
+; Right chorus
+
+  CHO RDA, sin1, SIN | REG | COMPC, mod_r + 300
+  CHO	RDA, sin1, 0, mod_r + 301
+  WRA mod_r + 700, 0.0
+
+; Right output to dac from end of modulation buffer
+
+  RDA  mod_r#, 1.0
+  SOF  make_up_gain, 0.0
+  SOF  make_up_gain, 0.0
   WRAX dacr, 0.0
 
 ; Alternately update LFO 0 and 1 rates
-  CHO RDAL, rmp0
-  SOF 1.0, -0.0625
-  SKP GEZ, update_lfo1
+  CHO  RDAL, sin0
+  SKP  GEZ,  update_lfo1
 
 update_lfo0:
   CLR
-  CHO RDAL, rmp1
-  SOF 0.05, 0.05  ; Scale it
+  CHO  RDAL, rmp0
+  RDAX SIN0_RATE, 0.01
   WRAX SIN0_RATE, 0.0
 
 update_lfo1:
   CLR
-  CHO RDAL, rmp1
-  SOF 0.05, 0.05  ; Scale it
+  CHO  RDAL, rmp0
+  RDAX SIN1_RATE, 0.01
   WRAX SIN1_RATE, 0.0
