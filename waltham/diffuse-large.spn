@@ -1,0 +1,238 @@
+; Inspired by the concert hall algorithm from lexicon 224xl.
+; Topology here: http://freeverb3vst.osdn.jp/doc/Progenitor.jpg
+
+; Variation: high diffusion, large sized space.
+
+; Memory Declarations
+
+  MEM lap1  346
+  MEM lap1d 2
+  MEM lap2  568
+  MEM ld    1529 + 2818 + 887 + 498 + 1957 + 1183 + 1832 + 2279
+
+  MEM rap1  297
+  MEM rap1d 2
+  MEM rap2  477
+  MEM rd    2117 + 2946 + 533 + 725 + 2117 + 997 + 1943 + 23
+
+; Lengths for nested all passes
+
+  EQU lap3  1529                ; start point inside ld
+  EQU lap3a 2818 + 887          ;
+  EQU lap3b 2818                ; inside lap3_a
+
+  EQU lap4  5734                ; start point inside ld
+  EQU lap4a 1957 + 1183 + 1832  ;
+  EQU lap4b 1957 + 1183         ; inside lap4_a
+  EQU lap4c 1957                ; inside lap4_b
+
+  EQU rap3  2117                ; start point inside rd
+  EQU rap3a 2946 + 533          ;
+  EQU rap3b 2946                ; inside rap3_a
+
+  EQU rap4  6322                ; start point inside rd
+  EQU rap4a 2117 + 997 + 603
+  EQU rap4b 2117 + 997          ; inside rap4_a
+  EQU rap4c 2117                ; inside rap4_b
+
+; Constants
+
+  EQU	k_1kHz	0.174549
+  EQU	k_2kHz	0.318630
+  EQU	k_4kHz	0.535735
+  EQU	k_8kHz  0.784458
+  EQU	k_12kHz 0.899931
+
+  EQU input_gain    0.25
+  EQU make_up_gain -2.0
+  EQU lfo_lpf       0.01
+
+; Program diffusion settings
+
+  EQU diffusion1 0.73   ; Input diffusors
+  EQU diffusion2 0.65   ; Outer all passes
+  EQU diffusion3 0.60   ; Inner all passes
+
+; Registers
+
+  EQU	llpf1	 reg1
+  EQU	llpf2	 reg2
+  EQU	rlpf1	 reg3
+  EQU rlpf2  reg4
+
+  EQU	rt	   reg5
+  EQU rt2    reg6
+  EQU r_fb   reg7
+  EQU l_fb   reg8
+  EQU new_freq reg9
+
+; Init program
+
+  SKP	run, loop
+  WLDS sin0, 22, 80        ; LFO rates and depth are randomized
+  WLDS sin1, 25, 90        ;
+  WLDR rmp0, 0, 4096       ; Ramp for S+H clock
+  WLDR rmp1, 16123, 4096   ; Ramp for "random" value to be sampled
+
+loop:
+
+; Prepare pot0 for reverb time (rt)
+
+  LDAX pot0
+  LOG	0.333, 0
+  EXP	1.0, 0
+  WRAX rt, 0.9
+  WRAX rt2, 0.0
+
+; Chorus depth set by pot2
+  RDAX pot2, 1.0
+  SOF 0.001, 0.0
+  WRAX SIN0_RANGE, 1.0
+  WRAX SIN1_RANGE, 0.0
+
+; Left input with lowpass filters
+
+  RDA  rd#, 1.0           ; Right loop feedback
+  MULX rt                  ; Scale for reverb time
+  RDAX adcl,  input_gain   ; Left input
+  RDFX llpf1, k_4kHz
+  WRAX llpf1, 1.0
+  RDFX llpf2, k_12kHz
+  WRAX llpf2, 1.0
+
+; Left diffusors into all pass loop
+
+  RDA  lap1#, -diffusion1
+  WRAP lap1,	 diffusion1
+  RDA  lap2#, -diffusion1
+  WRAP lap2,	 diffusion1
+  WRA  ld,     0.0
+
+; Right input with lowpass filters
+
+  RDA  ld#, 1.0          ; Left loop feedback
+  MULX rt                 ; Scale for reverb time
+  RDAX adcr,  input_gain  ; Right input
+  RDFX rlpf1, k_1kHz
+  WRAX rlpf1, 1.0
+  RDFX rlpf2, k_4kHz
+  WRAX rlpf2, 1.0
+
+; Right diffusors into all pass loop
+
+  RDA  rap1#, -diffusion1
+  WRAP rap1,	 diffusion1
+  RDA  rap2#, -diffusion1
+  WRAP rap2,	 diffusion1
+  WRA  rd,    0.0
+
+; Nested all passes on left loop
+
+  RDA   ld + lap3 + lap3a,  1.0
+  RDA   ld + lap3, diffusion2
+  WRAP  ld + lap3 + lap3a, -diffusion2
+  WRA   ld + lap3, 0.0
+
+  RDA   ld + lap3 + 1 + lap3b,  1.0
+  RDA   ld + lap3 + 1, diffusion3
+  WRAP  ld + lap3 + 1 + lap3b, -diffusion3
+  MULX  rt2
+  WRA   ld + lap3 + 1, 0.0
+
+; More nested all passes on left loop
+
+  RDA   ld + lap4 + lap4a,  1.0
+  RDA   ld + lap4, diffusion2
+  WRAP  ld + lap4 + lap4a, -diffusion2
+  WRA   ld + lap4, 0.0
+
+  RDA   ld + lap4 + 1 + lap4b,  1.0
+  RDA   ld + lap4 + 1, diffusion3
+  WRAP  ld + lap4 + 1 + lap4b, -diffusion3
+  MULX  rt2
+  WRA   ld + lap4 + 1, 0.0
+
+  ; This one is chorused
+  RDA   ld + lap4 + 2 + lap4c,  1.0
+  RDA   ld + lap4 + 2, diffusion3
+  WRAP  ld + lap4 + 2 + lap4c, -diffusion3
+  MULX  rt2
+  WRA   ld + lap4 + 2, 0.0
+
+; Nested all passes on right loop
+
+  RDA   rd + rap3 + rap3a,  1.0
+  RDA   rd + rap3, diffusion2
+  WRAP  rd + rap3 + rap3a, -diffusion2
+  WRA   rd + rap3, 0.0
+
+  RDA   rd + rap3 + 1 + rap3b,  1.0
+  RDA   rd + rap3 + 1, diffusion2
+  WRAP  rd + rap3 + 1 + rap3b, -diffusion2
+  MULX  rt2
+  WRA   rd + rap3 + 1, 0.0
+
+; More nested all passes on right loop
+
+  RDA   rd + rap4 + rap4a,  1.0
+  RDA   rd + rap4, diffusion2
+  WRAP  rd + rap4 + rap4a, -diffusion2
+  WRA   rd + rap4, 0.0
+
+  RDA   rd + rap4 + 1 + rap4b,  1.0
+  RDA   rd + rap4 + 1, diffusion2
+  WRAP  rd + rap4 + 1 + rap4b, -diffusion2
+  MULX  rt2
+  WRA   rd + rap4 + 1, 0.0
+
+  ; This one is chorused
+  RDA   rd + rap4 + 2 + rap4c,  1.0
+  RDA   rd + rap4 + 2, diffusion3
+  WRAP  rd + rap4 + 2 + rap4c, -diffusion3
+  MULX  rt2
+  WRA   rd + rap4 + 2, 0.0
+
+; New LFO frequency
+  CHO  RDAL, rmp1    ; 0-4096
+  SOF  0.05, 0.02    ; Scale it to a reasonable range
+  RDFX new_freq, lfo_lpf
+  WRAX new_freq, 0.0
+
+; Alternately update LFO 0 and 1 rates, switching by ramp0 clock
+  CHO RDAL, rmp0
+  SOF 1.0, -0.0625
+  SKP GEZ, update_lfo1
+
+update_lfo0:
+  LDAX new_freq
+  WRAX SIN0_RATE, 0.0
+
+update_lfo1:
+  LDAX new_freq
+  WRAX SIN1_RATE, 0.0
+
+; Add chorus inside lap4c and rap4c
+
+  CLR
+  CHO RDA, sin0, SIN | REG | COMPC, ld + lap4 + 300
+  CHO	RDA, sin0, 0,  ld + lap4 + 301
+  WRA ld + lap4 + 700, 0
+
+  CHO RDA, sin1, SIN | REG | COMPC, rd + rap4 + 300
+  CHO	RDA, sin1, 0,   rd + rap4 + 301
+  WRA rd + rap4 + 700, 0
+
+output:
+
+  RDA  ld + 400, 1.0
+  SOF  make_up_gain, 0.0
+  SOF  make_up_gain, 0.0
+  RDAX adcl, 0.5 ; temp
+  WRAX dacl, 0.0
+
+  RDA  rd + 34, 1.0
+  RDA  ld# - 2233, 0.4
+  SOF  make_up_gain, 0.0
+  SOF  make_up_gain, 0.0
+  RDAX dacr, 0.5 ; temp
+  WRAX dacr, 0.0
