@@ -43,36 +43,37 @@
   EQU	k_8kHz  0.784458
   EQU	k_12kHz 0.899931
 
-  EQU input_gain    0.25
+  EQU input_gain    0.125
   EQU make_up_gain -2.0
   EQU lfo_lpf       0.01
 
 ; Program diffusion settings
 
-  EQU diffusion1 0.73   ; Input diffusors
-  EQU diffusion2 0.65   ; Outer all passes
-  EQU diffusion3 0.60   ; Inner all passes
+  EQU diffusion1 0.35   ; Input diffusors
+  EQU diffusion2 0.72   ; Outer all passes
+  EQU diffusion3 0.64   ; Inner all passes
 
 ; Registers
 
+  EQU temp   reg0
   EQU	llpf1	 reg1
   EQU	llpf2	 reg2
   EQU	rlpf1	 reg3
   EQU rlpf2  reg4
 
   EQU	rt	   reg5
-  EQU rt2    reg6
-  EQU r_fb   reg7
-  EQU l_fb   reg8
-  EQU new_freq reg9
+  EQU lpf_cf reg7
+  EQU lhpf   reg8
+  EQU rhpf   reg9
+  EQU hpf_cf reg10
 
 ; Init program
 
   SKP	run, loop
-  WLDS sin0, 22, 80        ; LFO rates and depth are randomized
-  WLDS sin1, 25, 90        ;
-  WLDR rmp0, 0, 4096       ; Ramp for S+H clock
-  WLDR rmp1, 16123, 4096   ; Ramp for "random" value to be sampled
+  WLDS sin0, 200, 100      ; Sin LFO rates are randomized
+  WLDS sin1, 200, 100      ;
+  WLDR rmp0, 4023, 4096    ; Ramps for random values
+  WLDR rmp1, 6692, 4096    ;
 
 loop:
 
@@ -81,24 +82,43 @@ loop:
   LDAX pot0
   LOG	0.333, 0
   EXP	1.0, 0
-  WRAX rt, 0.9
-  WRAX rt2, 0.0
+  WRAX rt, 0.0
+
+; Prepare pot1 for low pass cutoff (~1k to ~7k)
+
+  LDAX pot1
+  SOF  0.7, 0.2
+  WRAX lpf_cf, 0.0
+
+; Pot 1 for hpf coefficient
+
+  LDAX pot1
+  SOF  0.3, 0
+  WRAX hpf_cf, 0.0
 
 ; Chorus depth set by pot2
   RDAX pot2, 1.0
-  SOF 0.001, 0.0
+  MULX pot2
+  SOF 0.01, 0.0
   WRAX SIN0_RANGE, 1.0
   WRAX SIN1_RANGE, 0.0
 
-; Left input with lowpass filters
+; Left input with filters
 
   RDA  rd#, 1.0           ; Right loop feedback
-  MULX rt                  ; Scale for reverb time
-  RDAX adcl,  input_gain   ; Left input
-  RDFX llpf1, k_4kHz
-  WRAX llpf1, 1.0
-  RDFX llpf2, k_12kHz
-  WRAX llpf2, 1.0
+  MULX rt                 ; Scale for reverb time
+  RDAX adcl,  input_gain  ; Left input
+
+  RDAX llpf1, -1.0        ; Adjustable lpf
+  MULX lpf_cf
+  RDAX llpf1,  1.0
+  WRAX llpf1,  1.0
+
+  SOF  -1, 0              ; High pass shelf
+  RDFX lhpf, 0.1
+  WRLX lhpf, -1
+  MULX hpf_cf
+  RDAX llpf1, 1.0
 
 ; Left diffusors into all pass loop
 
@@ -108,15 +128,22 @@ loop:
   WRAP lap2,	 diffusion1
   WRA  ld,     0.0
 
-; Right input with lowpass filters
+; Right input with filters
 
-  RDA  ld#, 1.0          ; Left loop feedback
-  MULX rt                 ; Scale for reverb time
-  RDAX adcr,  input_gain  ; Right input
-  RDFX rlpf1, k_1kHz
+  RDA  ld#, 1.0            ; Left loop feedback
+  MULX rt                  ; Scale for reverb time
+  RDAX adcr,  input_gain   ; Right input
+
+  RDAX rlpf1, -1.0         ; Adjustable lpf
+  MULX lpf_cf
+  RDAX rlpf1, 1.0
   WRAX rlpf1, 1.0
-  RDFX rlpf2, k_4kHz
-  WRAX rlpf2, 1.0
+
+  SOF  -1, 0              ; High pass shelf
+  RDFX rhpf, 0.1
+  WRLX rhpf, -1
+  MULX hpf_cf
+  RDAX rlpf1, 1.0
 
 ; Right diffusors into all pass loop
 
@@ -129,14 +156,13 @@ loop:
 ; Nested all passes on left loop
 
   RDA   ld + lap3 + lap3a,  1.0
-  RDA   ld + lap3, diffusion2
-  WRAP  ld + lap3 + lap3a, -diffusion2
+  RDA   ld + lap3, diffusion1
+  WRAP  ld + lap3 + lap3a, -diffusion1
   WRA   ld + lap3, 0.0
 
   RDA   ld + lap3 + 1 + lap3b,  1.0
-  RDA   ld + lap3 + 1, diffusion3
-  WRAP  ld + lap3 + 1 + lap3b, -diffusion3
-  MULX  rt2
+  RDA   ld + lap3 + 1, diffusion1
+  WRAP  ld + lap3 + 1 + lap3b, -diffusion1
   WRA   ld + lap3 + 1, 0.0
 
 ; More nested all passes on left loop
@@ -149,27 +175,24 @@ loop:
   RDA   ld + lap4 + 1 + lap4b,  1.0
   RDA   ld + lap4 + 1, diffusion3
   WRAP  ld + lap4 + 1 + lap4b, -diffusion3
-  MULX  rt2
   WRA   ld + lap4 + 1, 0.0
 
   ; This one is chorused
   RDA   ld + lap4 + 2 + lap4c,  1.0
   RDA   ld + lap4 + 2, diffusion3
   WRAP  ld + lap4 + 2 + lap4c, -diffusion3
-  MULX  rt2
   WRA   ld + lap4 + 2, 0.0
 
 ; Nested all passes on right loop
 
   RDA   rd + rap3 + rap3a,  1.0
-  RDA   rd + rap3, diffusion2
-  WRAP  rd + rap3 + rap3a, -diffusion2
+  RDA   rd + rap3, diffusion1
+  WRAP  rd + rap3 + rap3a, -diffusion1
   WRA   rd + rap3, 0.0
 
   RDA   rd + rap3 + 1 + rap3b,  1.0
-  RDA   rd + rap3 + 1, diffusion2
-  WRAP  rd + rap3 + 1 + rap3b, -diffusion2
-  MULX  rt2
+  RDA   rd + rap3 + 1, diffusion1
+  WRAP  rd + rap3 + 1 + rap3b, -diffusion1
   WRA   rd + rap3 + 1, 0.0
 
 ; More nested all passes on right loop
@@ -182,41 +205,44 @@ loop:
   RDA   rd + rap4 + 1 + rap4b,  1.0
   RDA   rd + rap4 + 1, diffusion2
   WRAP  rd + rap4 + 1 + rap4b, -diffusion2
-  MULX  rt2
   WRA   rd + rap4 + 1, 0.0
 
   ; This one is chorused
   RDA   rd + rap4 + 2 + rap4c,  1.0
   RDA   rd + rap4 + 2, diffusion3
   WRAP  rd + rap4 + 2 + rap4c, -diffusion3
-  MULX  rt2
   WRA   rd + rap4 + 2, 0.0
 
-; New LFO frequency
-  CHO  RDAL, rmp1    ; 0-4096
-  SOF  0.05, 0.02    ; Scale it to a reasonable range
-  RDFX new_freq, lfo_lpf
-  WRAX new_freq, 0.0
-
-; Alternately update LFO 0 and 1 rates, switching by ramp0 clock
-  CHO RDAL, rmp0
-  SOF 1.0, -0.0625
-  SKP GEZ, update_lfo1
+; Alternately update LFO 0 and 1 rates
+  CHO  RDAL, rmp0
+  SOF -1, 0
+  CHO  RDAL, rmp1
+  SKP  GEZ,  update_lfo1
 
 update_lfo0:
-  LDAX new_freq
+  CLR
+  CHO  RDAL, rmp0
+  SOF  0.2, 0.07
+  RDAX SIN0_RATE, 0.01
   WRAX SIN0_RATE, 0.0
+  SKP 0, chorus
 
 update_lfo1:
-  LDAX new_freq
+  CLR
+  CHO  RDAL, rmp1
+  SOF  0.2, 0.07
+  RDAX SIN1_RATE, 0.01
   WRAX SIN1_RATE, 0.0
 
-; Add chorus inside lap4c and rap4c
+chorus:
 
-  CLR
+; Add chorus inside most nested all pass lap4c
+
   CHO RDA, sin0, SIN | REG | COMPC, ld + lap4 + 300
   CHO	RDA, sin0, 0,  ld + lap4 + 301
   WRA ld + lap4 + 700, 0
+
+; Add chorus inside most nested all pass rap4c
 
   CHO RDA, sin1, SIN | REG | COMPC, rd + rap4 + 300
   CHO	RDA, sin1, 0,   rd + rap4 + 301
@@ -224,15 +250,13 @@ update_lfo1:
 
 output:
 
-  RDA  ld + 400, 1.0
+  RDA  ld + 276, 1.0
   SOF  make_up_gain, 0.0
   SOF  make_up_gain, 0.0
-  RDAX adcl, 0.5 ; temp
   WRAX dacl, 0.0
 
-  RDA  rd + 34, 1.0
-  RDA  ld# - 2233, 0.4
+  RDA  rd + 24, 1.0
+  RDA  ld# - 1540, 0.4
   SOF  make_up_gain, 0.0
   SOF  make_up_gain, 0.0
-  RDAX dacr, 0.5 ; temp
   WRAX dacr, 0.0
