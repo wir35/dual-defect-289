@@ -251,12 +251,13 @@ chorus:
 output:
 
   RDA  ld + 276, 1.0
+  RDA  rd#, -0.1
   SOF  make_up_gain, 0.0
   SOF  make_up_gain, 0.0
   WRAX dacl, 0.0
 
   RDA  rd + 24, 1.0
-  RDA  ld# - 1540, 0.4
+  RDA  ld#, -0.1
   SOF  make_up_gain, 0.0
   SOF  make_up_gain, 0.0
   WRAX dacr, 0.0

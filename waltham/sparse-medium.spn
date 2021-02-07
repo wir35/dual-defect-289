@@ -1,7 +1,7 @@
 ; Inspired by the concert hall algorithm from lexicon 224xl.
 ; Topology here: http://freeverb3vst.osdn.jp/doc/Progenitor.jpg
 
-; Variation: high diffusion, medium sized space.
+; Variation: low diffusion, sparse taps, medium sized space.
 
 ; Memory Declarations
 
@@ -44,14 +44,14 @@
   EQU	k_12kHz 0.899931
 
   EQU input_gain    0.125
-  EQU make_up_gain -2.0
+  EQU make_up_gain -1.7
   EQU lfo_lpf       0.01
 
 ; Program diffusion settings
 
-  EQU diffusion1 0.35   ; Input diffusors
-  EQU diffusion2 0.72   ; Outer all passes
-  EQU diffusion3 0.64   ; Inner all passes
+  EQU diffusion1 0.05   ; Input diffusors
+  EQU diffusion2 0.03   ; Outer all passes
+  EQU diffusion3 0.05   ; Inner all passes
 
 ; Registers
 
@@ -99,7 +99,7 @@ loop:
 ; Chorus depth set by pot2
   RDAX pot2, 1.0
   MULX pot2
-  SOF 0.005, 0.0
+  SOF 0.0025, 0.0
   WRAX SIN0_RANGE, 1.0
   WRAX SIN1_RANGE, 0.0
 
@@ -250,13 +250,15 @@ chorus:
 
 output:
 
-  RDA  ld + 276, 1.0
+  RDA  ld + 1276, 1.0
+  RDA  rd#, 1.0
   SOF  make_up_gain, 0.0
   SOF  make_up_gain, 0.0
   SOF  make_up_gain, 0.0
   WRAX dacl, 0.0
 
   RDA  rd + 24, 1.0
+  RDA  ld#, -1.0
   SOF  make_up_gain, 0.0
   SOF  make_up_gain, 0.0
   SOF  make_up_gain, 0.0

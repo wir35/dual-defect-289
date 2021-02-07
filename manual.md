@@ -290,3 +290,157 @@ for special effects.
 | Time  | Increases size. Decreases bandwidth. |
 | Regen | Not recommended on left. Right maybe. |
 | Bal   | Mix dry and wet signal on left side. Right at 100% if using feedback. |
+
+
+## Waltham
+
+#### 01 Long Delay
+
+Simple 1 second mono delay with two output taps. Use the right input
+for feedback, as it includes a low pass filter. Consider patching an output
+to a filter and back to the right input for feedback.
+
+| Control | Usage |
+|-------|------------------------------------
+| Ins   | Inputs summed to mono. |
+| Outs  | Left is tap 1. Right is tap 2. |
+| X     | Tap 1 time. |
+| Y     | Tap 2 time. |
+| Z     | Low pass filter cutoff on right input. |
+| Time  | Extends delay time. Reduces bandwidth. |
+| Regen | Use regen knobs to get echo feedback from 1 or 2. |
+| Bal   | Mix dry and wet signals. |
+
+#### 02 Stereo Delay
+
+Simple stereo delay up to 500ms with left and right times both adjustable.
+Includes a low pass filter on both channels.
+
+| Control | Usage |
+|-------|------------------------------------
+| Ins   | Stereo input. |
+| Outs  | Stereo output. |
+| X     | Left delay time. |
+| Y     | Right delay time. |
+| Z     | Low pass filter cutoff. |
+| Time  | Extends delay time. Reduces bandwidth. |
+| Regen | Use regen knobs to get echo feedback from either side. |
+| Bal   | Mix dry and wet signals. |
+
+#### 03 Sparse (Medium)
+
+Concert hall algorithm with extremely low internal diffusion. Sounds like a
+stereo multi-tap delay with increasingly blurry echoes.
+
+| Control | Usage |
+|-------|------------------------------------
+| Ins   | Stereo input. |
+| Outs  | Stereo output. |
+| X     | Internal delay regeneration. |
+| Y     | Tone control. |
+| Z     | Modulation depth. |
+| Time  | Extends delay time. Reduces bandwidth. |
+| Regen | Use regen knobs to get additional echo feedback from either side. |
+| Bal   | Mix dry and wet signals. |
+
+#### 04 Sparse (Large)
+
+Concert hall algorithm with extremely low internal diffusion. Sounds like a
+stereo multi-tap delay with increasingly blurry echoes.
+
+| Control | Usage |
+|-------|------------------------------------
+| Ins   | Stereo input. |
+| Outs  | Stereo output. |
+| X     | Internal delay regeneration. |
+| Y     | Tone control. |
+| Z     | Modulation depth. |
+| Time  | Extends delay time. Reduces bandwidth. |
+| Regen | Use regen knobs to get additional echo feedback from either side. |
+| Bal   | Mix dry and wet signals. |
+
+#### 05 Diffuse (Medium)
+
+Concert hall algorithm with high internal diffusion. Creates a very
+full and thick reverberation that builds slowly in density. The tone control is
+bassy when low and bright when high. This also affects the reverberation time so
+that lower or higher frequencies dwell longer. This program uses sizes close to
+the original algorithm.
+
+This program allows very deep, random modulation of the internal diffusors.
+Keep the modulation depth at lower settings for more naturalistic reverb,
+or high for special effects.
+
+| Control | Usage |
+|-------|------------------------------------
+| Ins   | Stereo input. |
+| Outs  | Stereo output. |
+| X     | Reverberation time. |
+| Y     | Tone control. |
+| Z     | Modulation depth. |
+| Time  | Extends reverb time and size. Reduces bandwidth. |
+| Regen | Not recommended. |
+| Bal   | Mix dry and wet signals. |
+
+#### 06 Diffuse (Large)
+
+Concert hall algorithm with  high internal diffusion. Creates a very
+full and thick reverberation that builds slowly in density. The tone control is
+bassy when low and bright when high. This also affects the reverberation time so
+that lower or higher frequencies dwell longer. This program uses sizes from the
+original algorithm that have been scaled up to more fully utilize all of the
+available delay memory.
+
+This program allows very deep, random modulation of the internal diffusors.
+Keep the modulation depth at lower settings for more naturalistic reverb,
+or high for special effects.
+
+| Control | Usage |
+|-------|------------------------------------
+| Ins   | Stereo input. |
+| Outs  | Stereo output. |
+| X     | Reverberation time. |
+| Y     | Tone control. |
+| Z     | Modulation depth. |
+| Time  | Extends reverb time and size. Reduces bandwidth. |
+| Regen | Not recommended. |
+| Bal   | Mix dry and wet signals. |
+
+#### 07 Far (Medium)
+
+Concert hall algorithm with high internal diffusion. The listen distance
+in this program is set very far so that the source appears much further away
+than in the other programs.
+
+Same tone control and modulation as the other programs.
+
+| Control | Usage |
+|-------|------------------------------------
+| Ins   | Stereo input. |
+| Outs  | Stereo output. |
+| X     | Reverberation time. |
+| Y     | Tone control. |
+| Z     | Modulation depth. |
+| Time  | Extends reverb time and size. Reduces bandwidth. |
+| Regen | Not recommended. |
+| Bal   | Mix dry and wet signals. |
+
+#### 08 Far (Large)
+
+Concert hall algorithm with high internal diffusion. The listen distance
+in this program is set very far so that the source appears much further away
+than in the other programs.
+
+Same tone control and modulation as the other programs.
+
+
+| Control | Usage |
+|-------|------------------------------------
+| Ins   | Stereo input. |
+| Outs  | Stereo output. |
+| X     | Reverberation time. |
+| Y     | Tone control. |
+| Z     | Modulation depth. |
+| Time  | Extends reverb time and size. Reduces bandwidth. |
+| Regen | Not recommended. |
+| Bal   | Mix dry and wet signals. |

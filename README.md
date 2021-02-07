@@ -59,6 +59,23 @@ be modulated in each.
 | 7 | 4 | Time     (large)  | Stereo reverb with variable delay size/time.        |
 | 8 | 0 | Mobius Verb       | Mono reverb. Left is signal, right is feedback.     |
 
+### Waltham Programs
+
+The Waltham programs are a simplified interpretation of the concert hall program
+from one of the well known early digital reverbs. The parameters for reverb time
+and equalization are greatly simplified to accommodate the small number of controls.
+
+| D | # |Program       |  Description  |
+|---|---|------------|---------------|
+| 1 | 7 | Long Delay        | Mono 1s delay. Summed mono input. Separate left and right taps. |
+| 2 | 3 | Stereo Delay      | Stereo 500ms delay.                 |
+| 3 | 5 | Sparse (medium)   | Stereo hall with sparse taps, low diffusion. |
+| 4 | 1 | Sparse (large)    | Stereo hall with sparse taps, low diffusion. |
+| 5 | 6 | Diffuse (medium)  | Stereo hall reverb, high diffusion.          |
+| 6 | 2 | Diffuse (large)   | Stereo hall reverb, high diffusion.          |
+| 7 | 4 | Far (medium)      | Stereo hall reverb, high diffusion, distant source. |
+| 8 | 0 | Far (large)       | Stereo hall reverb, high diffusion, distant source. |
+
 Note that the 289 program selection is not the same ordering as the EPROM
 
   *  The `#` column indicates the program position on the EPROM.

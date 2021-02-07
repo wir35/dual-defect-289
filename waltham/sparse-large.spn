@@ -1,39 +1,39 @@
 ; Inspired by the concert hall algorithm from lexicon 224xl.
 ; Topology here: http://freeverb3vst.osdn.jp/doc/Progenitor.jpg
 
-; Variation: high diffusion, medium sized space.
+; Variation: low diffusion, sparse echos, large sized space.
 
 ; Memory Declarations
 
-  MEM lap1  239
+  MEM lap1  346
   MEM lap1d 2
-  MEM lap2  397
-  MEM ld    1051 + 1949 + 613 + 347 + 1361 + 811 + 1259 + 1571
+  MEM lap2  568
+  MEM ld    1529 + 2818 + 887 + 498 + 1957 + 1183 + 1832 + 2279
 
-  MEM rap1  211
+  MEM rap1  297
   MEM rap1d 2
-  MEM rap2  331
-  MEM rd    1459 + 2039 + 367 + 503 + 1459 + 691 + 1361 + 17
+  MEM rap2  477
+  MEM rd    2117 + 2946 + 533 + 725 + 2117 + 997 + 1943 + 23
 
 ; Lengths for nested all passes
 
-  EQU lap3  1051                ; start point inside ld
-  EQU lap3a 1949 + 613          ;
-  EQU lap3b 1949                ; inside lap3_a
+  EQU lap3  1529                ; start point inside ld
+  EQU lap3a 2818 + 887          ;
+  EQU lap3b 2818                ; inside lap3_a
 
-  EQU lap4  3955                ; start point inside ld
-  EQU lap4a 1361 + 811 + 1259   ;
-  EQU lap4b 1361 + 811          ; inside lap4_a
-  EQU lap4c 1361                ; inside lap4_b
+  EQU lap4  5734                ; start point inside ld
+  EQU lap4a 1957 + 1183 + 1832  ;
+  EQU lap4b 1957 + 1183         ; inside lap4_a
+  EQU lap4c 1957                ; inside lap4_b
 
-  EQU rap3  1459                ; start point inside rd
-  EQU rap3a 2039 + 367          ;
-  EQU rap3b 2032                ; inside rap3_a
+  EQU rap3  2117                ; start point inside rd
+  EQU rap3a 2946 + 533          ;
+  EQU rap3b 2946                ; inside rap3_a
 
-  EQU rap4  4359                ; start point inside rd
-  EQU rap4a 1459 + 691 + 1361
-  EQU rap4b 1459 + 691          ; inside rap4_a
-  EQU rap4c 1459                ; inside rap4_b
+  EQU rap4  6322                ; start point inside rd
+  EQU rap4a 2117 + 997 + 603
+  EQU rap4b 2117 + 997          ; inside rap4_a
+  EQU rap4c 2117                ; inside rap4_b
 
 ; Constants
 
@@ -44,14 +44,14 @@
   EQU	k_12kHz 0.899931
 
   EQU input_gain    0.125
-  EQU make_up_gain -2.0
+  EQU make_up_gain -1.7
   EQU lfo_lpf       0.01
 
 ; Program diffusion settings
 
-  EQU diffusion1 0.35   ; Input diffusors
-  EQU diffusion2 0.72   ; Outer all passes
-  EQU diffusion3 0.64   ; Inner all passes
+  EQU diffusion1 0.1   ; Input diffusors
+  EQU diffusion2 0.05   ; Outer all passes
+  EQU diffusion3 0.03   ; Inner all passes
 
 ; Registers
 
@@ -99,7 +99,7 @@ loop:
 ; Chorus depth set by pot2
   RDAX pot2, 1.0
   MULX pot2
-  SOF 0.005, 0.0
+  SOF 0.01, 0.0
   WRAX SIN0_RANGE, 1.0
   WRAX SIN1_RANGE, 0.0
 
@@ -250,13 +250,15 @@ chorus:
 
 output:
 
-  RDA  ld + 276, 1.0
+  RDA  ld + 1276, 1.0
+  RDA  rd#, 1.0
   SOF  make_up_gain, 0.0
   SOF  make_up_gain, 0.0
   SOF  make_up_gain, 0.0
   WRAX dacl, 0.0
 
   RDA  rd + 24, 1.0
+  RDA  ld#, -1.0
   SOF  make_up_gain, 0.0
   SOF  make_up_gain, 0.0
   SOF  make_up_gain, 0.0
