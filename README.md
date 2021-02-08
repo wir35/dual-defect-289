@@ -25,6 +25,9 @@ load distinct sets of 8 programs. The Cambridge programs are intended to be
 loaded into the top section, and the Boston programs into the lower. There are
 a number of use cases where the programs can interoperate.
 
+The Waltham programs are an alternative bank for users who might prefer the
+thicker character of traditional, vintage programs.
+
 ### Cambridge Programs
 
 The Cambridge programs are a diverse set of delay and stereo-widening effects.
