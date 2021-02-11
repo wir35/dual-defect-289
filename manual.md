@@ -169,8 +169,8 @@ to gate input signal if turned to 0.
 | Ins   | Stereo inputs. |
 | Outs  | Stereo outputs. |
 | X     | Reverb time. |
-| Y     | Low pass filter cutoff, left side. |
-| Z     | Low pass filter cutoff, right side. |
+| Y     | Unused. |
+| Z     | Low pass filter cutoff.  |
 | Time  | Increases size. Decreases bandwidth. |
 | Regen | Not recommended. Howling. |
 | Bal   | Blend dry and wet signals if desired. |
@@ -187,8 +187,8 @@ to gate input signal if turned to 0.
 | Ins   | Stereo inputs. |
 | Outs  | Stereo outputs. |
 | X     | Reverb time. |
-| Y     | Low pass filter cutoff, left side. |
-| Z     | Low pass filter cutoff, right side. |
+| Y     | Unused.  |
+| Z     | Low pass filter cutoff. |
 | Time  | Increases size. Decreases bandwidth. |
 | Regen | Not recommended. Howling. |
 | Bal   | Blend dry and wet signals if desired. |
