@@ -6,19 +6,18 @@
 ; Memory Declarations
 
   MEM lap1  239
-  MEM lap1d 2
   MEM lap2  397
-  MEM ld    1051 + 1949 + 613 + 347 + 1361 + 811 + 1259 + 1571
+  MEM ld    1051 + 1949 + 613 + 347 + 1361 + 811 + 1259 + 1571  ; "left delay"
 
   MEM rap1  211
-  MEM rap1d 2
   MEM rap2  331
-  MEM rd    1459 + 2039 + 367 + 503 + 1459 + 691 + 1361 + 17
+  MEM rd    1459 + 2039 + 367 + 503 + 1459 + 691 + 1361 + 17    ; "right delay"
 
 ; Lengths for nested all passes
+; These times have been slightly modified from the published algorithm.
 
   EQU lap3  1051                ; start point inside ld
-  EQU lap3a 1949 + 613          ;
+  EQU lap3a 1949 + 613          ; length
   EQU lap3b 1949                ; inside lap3_a
 
   EQU lap4  3955                ; start point inside ld
@@ -37,41 +36,42 @@
 
 ; Constants
 
+  EQU k_300Hz 0.055923
   EQU	k_1kHz	0.174549
   EQU	k_2kHz	0.318630
   EQU	k_4kHz	0.535735
   EQU	k_8kHz  0.784458
   EQU	k_12kHz 0.899931
 
-  EQU input_gain    0.125
+  EQU input_gain    0.25
   EQU make_up_gain -2.0
   EQU lfo_lpf       0.01
 
 ; Program diffusion settings
+; Reasonable values are 0.1 to 0.9, higher = more diffusion
 
-  EQU diffusion1 0.35   ; Input diffusors
-  EQU diffusion2 0.72   ; Outer all passes
-  EQU diffusion3 0.64   ; Inner all passes
+  EQU diffusion1 0.35        ; Input diffusors "diffusion"
+  EQU diffusion2 0.72        ; Outer all passes "diffusion"
+  EQU diffusion3 0.64        ; Inner nested all passes "definition"
 
 ; Registers
 
   EQU temp   reg0
-  EQU	llpf1	 reg1
-  EQU	llpf2	 reg2
-  EQU	rlpf1	 reg3
-  EQU rlpf2  reg4
+  EQU	llpf	 reg1
+  EQU	rlpf	 reg3
 
   EQU	rt	   reg5
   EQU lpf_cf reg7
   EQU lhpf   reg8
   EQU rhpf   reg9
-  EQU hpf_cf reg10
+  EQU hpf_shelf reg10
+
+  EQU lfb    reg11
+  EQU rfb    reg12
 
 ; Init program
 
   SKP	run, loop
-  WLDS sin0, 200, 100      ; Sin LFO rates are randomized
-  WLDS sin1, 200, 100      ;
   WLDR rmp0, 4023, 4096    ; Ramps for random values
   WLDR rmp1, 6692, 4096    ;
 
@@ -90,35 +90,37 @@ loop:
   SOF  0.7, 0.2
   WRAX lpf_cf, 0.0
 
-; Pot 1 for hpf coefficient
+; Pot 1 for hpf shelving coefficient
 
   LDAX pot1
   SOF  0.3, 0
-  WRAX hpf_cf, 0.0
+  WRAX hpf_shelf, 0.0
 
 ; Chorus depth set by pot2
+
   RDAX pot2, 1.0
   MULX pot2
   SOF 0.005, 0.0
   WRAX SIN0_RANGE, 1.0
   WRAX SIN1_RANGE, 0.0
 
-; Left input with filters
+; Left input with feedback from right loop and filters
 
   RDA  rd#, 1.0           ; Right loop feedback
   MULX rt                 ; Scale for reverb time
-  RDAX adcl,  input_gain  ; Left input
+  WRAX rfb, -1.0          ; Save feedback, inverse for high pass calc
 
-  RDAX llpf1, -1.0        ; Adjustable lpf
-  MULX lpf_cf
-  RDAX llpf1,  1.0
-  WRAX llpf1,  1.0
-
-  SOF  -1, 0              ; High pass shelf
-  RDFX lhpf, 0.1
+  RDFX lhpf, k_300Hz      ; Adjustable high pass shelf
   WRLX lhpf, -1
-  MULX hpf_cf
-  RDAX llpf1, 1.0
+  MULX hpf_shelf
+  RDAX rfb, 1.0
+
+  RDAX adcl,  input_gain  ; Add in left input
+
+  RDAX llpf, -1.0         ; Adjustable lpf
+  MULX lpf_cf
+  RDAX llpf,  1.0
+  WRAX llpf,  1.0
 
 ; Left diffusors into all pass loop
 
@@ -132,18 +134,19 @@ loop:
 
   RDA  ld#, 1.0            ; Left loop feedback
   MULX rt                  ; Scale for reverb time
-  RDAX adcr,  input_gain   ; Right input
+  WRAX lfb, -1.0           ; Save left feedback, inverse for high pass calc
 
-  RDAX rlpf1, -1.0         ; Adjustable lpf
-  MULX lpf_cf
-  RDAX rlpf1, 1.0
-  WRAX rlpf1, 1.0
-
-  SOF  -1, 0              ; High pass shelf
-  RDFX rhpf, 0.1
+  RDFX rhpf, k_300Hz       ; Adjustable high pass shelf
   WRLX rhpf, -1
-  MULX hpf_cf
-  RDAX rlpf1, 1.0
+  MULX hpf_shelf
+  RDAX lfb, 1.0
+
+  RDAX adcr,  input_gain   ; Add in right input
+
+  RDAX rlpf, -1.0          ; Adjustable lpf
+  MULX lpf_cf
+  RDAX rlpf, 1.0
+  WRAX rlpf, 1.0
 
 ; Right diffusors into all pass loop
 
@@ -156,13 +159,13 @@ loop:
 ; Nested all passes on left loop
 
   RDA   ld + lap3 + lap3a,  1.0
-  RDA   ld + lap3, diffusion1
-  WRAP  ld + lap3 + lap3a, -diffusion1
+  RDA   ld + lap3, diffusion2
+  WRAP  ld + lap3 + lap3a, -diffusion2
   WRA   ld + lap3, 0.0
 
   RDA   ld + lap3 + 1 + lap3b,  1.0
-  RDA   ld + lap3 + 1, diffusion1
-  WRAP  ld + lap3 + 1 + lap3b, -diffusion1
+  RDA   ld + lap3 + 1, diffusion3
+  WRAP  ld + lap3 + 1 + lap3b, -diffusion3
   WRA   ld + lap3 + 1, 0.0
 
 ; More nested all passes on left loop
@@ -186,13 +189,13 @@ loop:
 ; Nested all passes on right loop
 
   RDA   rd + rap3 + rap3a,  1.0
-  RDA   rd + rap3, diffusion1
-  WRAP  rd + rap3 + rap3a, -diffusion1
+  RDA   rd + rap3, diffusion2
+  WRAP  rd + rap3 + rap3a, -diffusion2
   WRA   rd + rap3, 0.0
 
   RDA   rd + rap3 + 1 + rap3b,  1.0
-  RDA   rd + rap3 + 1, diffusion1
-  WRAP  rd + rap3 + 1 + rap3b, -diffusion1
+  RDA   rd + rap3 + 1, diffusion3
+  WRAP  rd + rap3 + 1 + rap3b, -diffusion3
   WRA   rd + rap3 + 1, 0.0
 
 ; More nested all passes on right loop
@@ -214,24 +217,30 @@ loop:
   WRA   rd + rap4 + 2, 0.0
 
 ; Alternately update LFO 0 and 1 rates
+; See the common/random.spn file for more comments
+
+alternate:
+
   CHO  RDAL, rmp0
   SOF -1, 0
   CHO  RDAL, rmp1
   SKP  GEZ,  update_lfo1
 
 update_lfo0:
+
   CLR
   CHO  RDAL, rmp0
   SOF  0.2, 0.07
-  RDAX SIN0_RATE, 0.01
+  RDAX SIN0_RATE, lfo_lpf
   WRAX SIN0_RATE, 0.0
   SKP 0, chorus
 
 update_lfo1:
+
   CLR
   CHO  RDAL, rmp1
   SOF  0.2, 0.07
-  RDAX SIN1_RATE, 0.01
+  RDAX SIN1_RATE, lfo_lpf
   WRAX SIN1_RATE, 0.0
 
 chorus:
@@ -248,16 +257,25 @@ chorus:
   CHO	RDA, sin1, 0,   rd + rap4 + 301
   WRA rd + rap4 + 700, 0
 
+; There are three output taps.
+; The nearest is the loudest, and they are weighted by pot0,
+; which also controls overall reverb decay time.
+; This makes longer reverb times more dense than shorter ones.
+
 output:
 
-  RDA  ld + 276, 1.0
-  SOF  make_up_gain, 0.0
-  SOF  make_up_gain, 0.0
+  RDA  ld# - 20, 0.1               ; Accumulate the farthest tap
+  RDA  ld + lap3 + lap3a + 10, 0.2 ; Accumulate the middle tap
+  MULX pot0                        ; Scale by pot0
+  RDA  ld + 276, 1.0               ; Mix in the close tap
+  SOF  make_up_gain, 0.0           ; Make up gain
   SOF  make_up_gain, 0.0
   WRAX dacl, 0.0
 
-  RDA  rd + 24, 1.0
-  SOF  make_up_gain, 0.0
-  SOF  make_up_gain, 0.0
+  RDA  rd# - 9, 0.1                ; Far tap
+  RDA  rd + rap3 + rap3a + 5, 0.2  ; Middle tap
+  MULX pot0
+  RDA  rd + 24, 1.0                ; Closest tap
+  SOF  make_up_gain, 0.0           ; Make up gain
   SOF  make_up_gain, 0.0
   WRAX dacr, 0.0

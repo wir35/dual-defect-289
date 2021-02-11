@@ -1,35 +1,43 @@
-; A way to generate random sin lfos
+; A way to generate random sin lfos.
+; This scheme is used for the lfos in the Waltham bank.
 
 ; Init program
 
   SKP	run, loop
   WLDS sin0, 200, 16384     ; LFO rates will be randomized
-  WLDS sin1, 200, 16384     ;
-  WLDR rmp0, 4123, 4096     ; Ramp for "random" value to be sampled
-  WLDR rmp1, 5692, 4096     ;
+  WLDS sin1, 200, 16384     ; These frequencies don't matter
+  WLDR rmp0, 4123, 4096     ; Ramp for random value to be sampled
+  WLDR rmp1, 5692, 4096     ; Ramp for random value to be sampled
 
 loop:
 
 ; Alternately update LFO 0 and 1 rates
+; Ramp 0 is subtracted from Ramp 1, and either lfo 0 or 1 is modulated
+; depending on whether the result is positive or negative.
+; This creates a quasi-random pattern of changing modulation.
+
   CHO  RDAL, rmp0
   SOF -1, 0
   CHO  RDAL, rmp1
-  SKP  GEZ,  update_lfo1
+  SKP  GEZ,  update_lfo1  ; Jump to update_lfo1 half the time
 
 update_lfo0:
   CLR
-  CHO  RDAL, rmp0
-  SOF  0.2, 0.07
-  RDAX SIN0_RATE, 0.01
-  WRAX SIN0_RATE, 0.0
-  SKP 0, output
-  
+  CHO  RDAL, rmp0       ; Read the ramp lfo value
+  SOF  0.2, 0.07        ; Scale it to a reasonable range
+  RDAX SIN0_RATE, 0.01  ; Low pass filter it, so it changes more slowly
+  WRAX SIN0_RATE, 0.0   ;
+  SKP 0, output         ; Jump over the next section
+
 update_lfo1:
   CLR
   CHO  RDAL, rmp1
   SOF  0.2, 0.07
   RDAX SIN1_RATE, 0.01
   WRAX SIN1_RATE, 0.0
+
+; If you look at these on a scope, it should look like two sine waves,
+; smoothly changing frequency from 1 - 10 Hz or so.
 
 output:
 
