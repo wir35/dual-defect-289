@@ -169,17 +169,17 @@ loop:
   MULX cutoff
   RDAX lpf3, 1.0
   WRAX lpf3, 1.0
-  WRA del3, 0.0
+  WRA  del3, 0.0
 
   RDAX a30, 1.0
   RDAX a31, 1.0
   MULX rt
   RDAX adcl, input_gain
   RDAX lpf4, -1.0
-  MULX pot2
+  MULX cutoff
   RDAX lpf4, 1.0
   WRAX lpf4, 1.0
-  WRA del4, 0.0
+  WRA  del4, 0.0
 
   RDAX a00, 1.0
   RDAX a01, -1.0
