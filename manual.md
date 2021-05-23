@@ -160,9 +160,7 @@ to a filter and back to the right input for feedback.
 #### 02 Darkness (Medium)
 
 Medium sized, true-stereo reverb with modulation of low pass filters on input.
-Turn down Y and Z for a very dark reverb, or selectively cut one side to make
-the sound appear to originate from one side. Y and Z inputs can also be used
-to gate input signal if turned to 0.
+Turn down Z for a very dark reverb, or all the way to gate input signal.
 
 | Control | Usage |
 |-------|------------------------------------
@@ -178,9 +176,7 @@ to gate input signal if turned to 0.
 #### 03 Darkness (Large)
 
 Large sized, true-stereo reverb with modulation of low pass filters on input.
-Turn down Y and Z for a very dark reverb, or selectively cut one side to make
-the sound appear to originate from one side. Y and Z inputs can also be used
-to gate input signal if turned to 0.
+Turn down Z for a very dark reverb, or all the way to gate input signal.
 
 | Control | Usage |
 |-------|------------------------------------

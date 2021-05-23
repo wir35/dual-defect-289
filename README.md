@@ -62,29 +62,7 @@ be modulated in each.
 | 7 | 4 | Time     (large)  | Stereo reverb with variable delay size/time.        |
 | 8 | 0 | Mobius Verb       | Mono reverb. Left is signal, right is feedback.     |
 
-### Waltham Programs
-
-The Waltham programs are a simplified interpretation of the concert hall program
-from one of the well known early digital reverbs. The parameters for reverb time
-and equalization are greatly simplified to accommodate the small number of controls.
-
-| D | # |Program       |  Description  |
-|---|---|------------|---------------|
-| 1 | 7 | Long Delay        | Mono 1s delay. Summed mono input. Separate left and right taps. |
-| 2 | 3 | Stereo Delay      | Stereo 500ms delay.                 |
-| 3 | 5 | Sparse (medium)   | Stereo hall with sparse taps, low diffusion. |
-| 4 | 1 | Sparse (large)    | Stereo hall with sparse taps, low diffusion. |
-| 5 | 6 | Diffuse (medium)  | Stereo hall reverb, high diffusion.          |
-| 6 | 2 | Diffuse (large)   | Stereo hall reverb, high diffusion.          |
-| 7 | 4 | Far (medium)      | Stereo hall reverb, high diffusion, distant source. |
-| 8 | 0 | Far (large)       | Stereo hall reverb, high diffusion, distant source. |
-
-Note that the 289 program selection is not the same ordering as the EPROM
-
-  *  The `#` column indicates the program position on the EPROM.
-  *  The `D` column indicates the algorithm position on the 289 panel.
-
-### Cooperative Patches
+### Cambridge-Boston Cooperative Patches
 
 The two sets of programs are designed to interoperate in useful ways when patched
 together. Here are a few ideas:
@@ -101,3 +79,27 @@ together. Here are a few ideas:
 3. The Mobius Verb is the last program in both sets. Try it as a stereo reverb,
    using each section for left and right individually. The right output is
    feedback that can be cross-patched between the two sections.
+
+### Waltham Programs
+
+The Waltham programs are a simplified interpretation of the concert hall program
+from one of the well known early digital reverbs. The parameters for reverb time
+and equalization are greatly simplified to accommodate the small number of controls.
+
+| D | # |Program       |  Description  |
+|---|---|--------------|---------------|
+| 1 | 7 | Long Delay        | Mono 1s delay. Summed mono input. Separate left and right taps. |
+| 2 | 3 | Stereo Delay      | Stereo 500ms delay.                 |
+| 3 | 5 | Sparse (medium)   | Stereo hall with sparse taps, low diffusion. |
+| 4 | 1 | Sparse (large)    | Stereo hall with sparse taps, low diffusion. |
+| 5 | 6 | Diffuse (medium)  | Stereo hall reverb, high diffusion.          |
+| 6 | 2 | Diffuse (large)   | Stereo hall reverb, high diffusion.          |
+| 7 | 4 | Far (medium)      | Stereo hall reverb, high diffusion, distant source. |
+| 8 | 0 | Far (large)       | Stereo hall reverb, high diffusion, distant source. |
+
+### Notes
+
+Note that the 289 program selection is not the same ordering as the EPROM
+
+ *  The `#` column indicates the program position on the EPROM.
+ *  The `D` column indicates the algorithm position on the 289 panel.
