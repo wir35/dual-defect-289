@@ -1,0 +1,320 @@
+; New hall type mono reverb program.
+; Can be used on both sections of the 289 in a figure 8 loop.
+
+; Left input: signal
+; Right input: feedback
+; Left output: signal
+; Right output: feedback
+
+; Controls:
+; Pot 0: Feedback amount or reverb time
+; Pot 1: Tone control
+; Pot 2: Delay time or reverb size
+
+; Memory declarations
+
+  MEM tap1 1
+  MEM tap2 1
+  MEM dif1 346
+  MEM dif2 568
+  MEM del1 31846
+
+; Constants
+
+  EQU bits_12 %01111111_11111000_00000000
+  EQU bits_14 %01111111_11111110_00000000
+  EQU bits_16 %01111111_11111111_10000000
+  EQU bits_18 %01111111_11111111_11100000
+  EQU bits_20 %01111111_11111111_11111000
+
+  EQU f_300Hz 0.055923
+  EQU	f_1kHz	0.174549
+  EQU	f_2kHz	0.318630
+  EQU	f_4kHz	0.535735
+  EQU	f_8kHz  0.784458
+  EQU	f_12kHz 0.899931
+
+  EQU hpf_freq f_300Hz  ; Tone control
+  EQU lpf_freq f_2kHz   ; Tone control
+
+  EQU full_scale   32767 * 256 ; 0x7FFF00
+  EQU input_gain   0.25 ; 1/4
+  EQU make_up_gain -2   ; 4x (when applied twice)
+
+; All pass diffusor addresses in del1
+
+  EQU ap_a del1 + 10
+  EQU ap1  1723
+  EQU ap2  811
+
+  EQU ap_b del1 + 2134
+  EQU ap3  2663
+  EQU ap4  941
+
+  EQU ap_c del1 + 5801
+  EQU ap5  4019
+  EQU ap6  1801
+
+  EQU diffusion1  0.55
+  EQU diffusion2  0.25
+
+; Registers and intermediate nodes
+
+  EQU temp_acc     reg1 ; Temporary accumulator register
+  EQU	rt	         reg2 ; Delay feedback amount or reverb time (rt)
+  EQU new_tap_time reg3 ; New delay tap time when moved by pot
+  EQU tap_time1    reg4 ; Tap 1 time sample and hold
+  EQU tap_time2    reg5 ; Tap 2 time sample and hold
+  EQU xfade        reg6 ; Cross fade mix of delay taps
+  EQU tap1_mul     reg7 ; Cross fade level for tap 1
+  EQU tap2_mul     reg8 ; Cross fade level for tap 2
+  EQU input        reg9 ; Conditioned input signal
+  EQU pre_emp_hi  reg10 ; Pre-emphasis shelf state
+  EQU post_emp_l  reg11 ; Post de-emphasis shelf state
+  EQU post_emp_r  reg12 ; Post de-emphasis shelf state
+  EQU lo_cut      reg13 ; DC-blocker high pass state
+  EQU hpf         reg14 ; Tone control high pass filter state
+  EQU lpf         reg15 ; Tone control low pass filter state
+  EQU hpf_gain    reg16 ; Tone control high pass shelf gain (-0.5 to 0.0)
+  EQU lpf_gain    reg17 ; Tone control low pass shelf gain (-0.5 to 0.0)
+  EQU bass_boost  reg18 ; Bass boost low shelf
+
+; Init program
+
+  SKP	 run, loop
+  WLDS sin0, 25, 32767   ; lfo0 is used for the cross fade signal
+  WLDS sin1, 25, 128     ; lfo1 is used for chorus and diffuser mod
+  WLDR rmp1, 6692, 4096  ; ramp1 is sampled for "random" values for lfo1
+
+loop:
+
+rt_pot:
+
+  LDAX pot0      ; Shape pot0 for regeneration amount (rt)
+  WRAX rt, 0.0
+
+tone_pot:
+
+  LDAX pot1               ; Tone is controlled by pot1
+  SOF  1.0, -0.5          ; Shape to -0.5 - 0.5
+  SKP  GEZ, set_low_gain  ;
+
+set_high_gain:
+                          ; Lower half apply a high cut
+  WRAX hpf_gain, 0.0      ; Negative shelf (-0.5 - 0.0) gain on hpf
+  WRAX lpf_gain, 0.0      ; The lpf shelf is flat
+  SKP 0, tone_pots_done
+
+set_low_gain:
+                          ; Upper half apply a low cut
+  SOF  -1.0, 0.0          ; Invert 0.0 - 0.5 to 0.0 - -0.5
+  WRAX lpf_gain, 0.0      ; Negative shelf (0.0 - -0.5) on lpf
+  WRAX hpf_gain, 0.0      ; The hpf shelf is flat
+
+tone_pots_done:
+
+; Tap times by pot2
+; There are two taps, tap_time1 and tap_time2.
+; Each are only updated when their part of the crossfade is low.
+
+set_new_tap_time:
+
+  CHO RDAL, rmp0          ; Randomness
+  SOF 0.25, 0.0
+  RDAX pot2, 0.825        ; Load
+  SOF 0.665, 0.33         ; Scale to del1 after the diffusers
+  WRAX new_tap_time, 0.0  ; Store
+
+; Get LFO values
+; Rectify the sin and cos signals to get a pair of xfade curves
+
+  CHO RDAL, sin0          ; Read sin0 value
+  SOF 0.5, 0.5            ; Scale lfo (-1 to 1) to 0 to 1
+  WRAX tap1_mul, 1.0      ; The tap 1 level stored in tap1_mul
+  SOF -1.0, 0.999         ; Invert the lfo for the other side of the xfade
+  WRAX tap2_mul, 0.0      ; The tap 2 level stored in tap2_mul
+
+; Update the tap times when the xfade level is low,
+; otherwise skip and leave the tap where it is.
+
+check_tap_1:
+  LDAX tap1_mul
+  SOF  1.0, -0.001
+  SKP  GEZ, check_tap_2
+
+update_tap_1:
+  LDAX new_tap_time
+  WRAX tap_time1, 0.0
+
+update_lfo1_rate:
+  CHO RDAL, rmp1       ; obtain a quasi random value
+  SOF  0.05, 0.015     ; scale it  0.05 is low mod 0.15 is high mod
+  WRAX SIN1_RATE, 0.0  ; sin1 rate only updated infrequently
+
+check_tap_2:
+  LDAX tap2_mul
+  SOF 1.0, -0.001
+  SKP GEZ, taps_done
+
+update_tap_2:
+  LDAX new_tap_time
+  WRAX tap_time2, 0.0
+
+update_lfo0_rate:
+
+  CHO RDAL, rmp1
+  SOF  0.15, 0.05  ; can be slower 0.1 to 0.2
+  WRAX SIN0_RATE, 0.0
+
+taps_done:
+
+; Scale crossfade frequency with delay time
+
+read_tap_1:
+  CLR
+  OR   full_scale          ; Load ACC with 0x7FFF00
+  MULX tap_time1           ; Scale by the tap position
+  WRAX addr_ptr, 0         ; Set addr_ptr register for tap time
+  RMPA 1.0                 ; Read delay memory
+  MULX tap1_mul            ; Scale amplitude for xfade curve
+  WRA  tap1, 0.0           ; Write
+
+read_tap_2:
+
+  OR   full_scale          ; Load ACC with 0x7FFF00
+  MULX tap_time2           ; Scale by the tap position
+  WRAX addr_ptr, 0         ; Set addr_ptr register for tap time
+  RMPA 1.0                 ; Read delay memory
+  MULX tap2_mul            ; Scale amplitude for xfade curve
+                           ; Tap 2 in ACC
+
+add_taps:
+
+  RDA  tap1,  1.0          ; Add in tap1
+  WRAX xfade, 1.0          ; Save the xfade result
+
+; Output loop to DAC (Right)
+
+  SOF make_up_gain, 0.0    ; Scale up for make-up gain
+  SOF make_up_gain, 0.0
+  WRAX dacr, 0.0
+
+; Output reverb to DAC (Left)
+
+  RDA del1 + 2, 0.5
+  RDA del1 + 5800, 0.5
+
+bass_boost_and_output:
+
+  WRAX temp_acc, 1.0
+  RDFX bass_boost, f_300Hz
+  WRAX bass_boost, 1.0
+  RDAX temp_acc, 1.0
+
+  SOF make_up_gain, 0.0    ; Scale up for make-up gain
+  SOF make_up_gain, 0.0
+  WRAX dacl, 0.0           ; Write to dac left output
+
+; Input conditioning
+
+  RDAX adcl, input_gain
+  RDAX adcr, input_gain
+
+input_diffusors:
+
+  RDA  dif1#, -0.68
+  WRAP dif1,	 0.68
+  RDA  dif2#,  0.57
+  WRAP dif2,	 -0.57
+
+  WRAX input, 0.0
+
+; Process feedback with filters and combine with input
+
+  RDAX xfade, 1.0          ; Read output xfade back in for feedback
+
+lo_cut_filter:
+
+  RDFX lo_cut, 0.005
+  WRHX lo_cut, -1.0
+
+hi_shelf_tone_control:
+
+  WRAX temp_acc, 1.0
+  RDFX hpf, hpf_freq
+  WRHX hpf, -1.0
+  MULX hpf_gain
+  RDAX temp_acc, 1.0
+
+lo_shelf_tone_control:
+
+  WRAX temp_acc, 1.0
+  RDFX lpf, lpf_freq
+  WRLX lpf, -1.0
+  MULX lpf_gain
+  RDAX temp_acc, 1.0
+
+; Scale feedback for rt and then add the input signal
+
+  MULX rt
+  RDAX input, 1.0
+
+; Feedback processing complete, write to the delay memory
+
+  WRA del1, 0.0
+
+diffusor_a:
+
+  RDA   ap_a + ap1,  1.0
+  RDA   ap_a, diffusion1
+  WRAP  ap_a + ap1, -diffusion1
+  WRA   ap_a, 0.0
+
+  RDA   ap_a + ap2,  1.0
+  RDA   ap_a + 1, diffusion2
+  WRAP  ap_a + ap2, -diffusion2
+  WRA   ap_a + 1, 0.0
+
+diffusor_a_mod:
+
+  CHO RDA, sin1, SIN | REG | COMPC, ap_a + 128
+  CHO	RDA, sin1, SIN,  ap_a + 129
+  WRA ap_a + 256, 0
+
+  CHO RDA, sin1, SIN | REG | COMPA, ap_a + ap2 + 128
+  CHO RDA, sin1, SIN | COMPC | COMPA,  ap_a + ap2 + 129
+  WRA ap_a + ap2 + 256, 0
+
+diffusor_b:
+
+  RDA   ap_b + ap3,  1.0
+  RDA   ap_b, diffusion1
+  WRAP  ap_b + ap3, -diffusion1
+  WRA   ap_b, 0.0
+
+  RDA   ap_b + ap4,  1.0
+  RDA   ap_b + 1, diffusion2
+  WRAP  ap_b + ap4, -diffusion2
+  WRA   ap_b + 1, 0.0
+
+diffusor_b_mod:
+
+  CHO RDA, sin1, SIN | REG | COMPA, ap_b + 128
+  CHO	RDA, sin1, SIN | COMPC | COMPA,  ap_b + 129
+  WRA ap_b + 256, 0
+
+  CHO RDA, sin1, SIN | REG | COMPC, ap_b + ap4 + 128
+  CHO	RDA, sin1, SIN,  ap_b + ap4 + 129
+  WRA ap_b + ap4 + 256, 0
+
+diffusor_c:
+
+  RDA   ap_c + ap5,  1.0
+  RDA   ap_c, diffusion1
+  WRAP  ap_c + ap5, -diffusion1
+  WRA   ap_c, 0.0
+
+  RDA   ap_c + ap6,  1.0
+  RDA   ap_c + 1, diffusion2
+  WRAP  ap_c + ap6, -diffusion2
+  WRA   ap_c + 1, 0.0

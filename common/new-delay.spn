@@ -1,8 +1,9 @@
 ; New delay program
 ; Summed mono input with separately adjustable left and right taps.
+; Knob changes powers of 2 delay times. Use clock speed to fine tune delay time.
 
 ; There is no digital feedback in this program.
-; Use analog feedback, preferably to the right side.
+; Use analog feedback, on either side.
 ; Left side: delay input, right side: feedback input.
 ; Low pass filter only on right input.
 ; Unity gain through the delay line.
@@ -11,7 +12,7 @@
 ; Controls:
 ; Pot 0: Left tap time
 ; Pot 1: Right tap time
-; Pot 2: Low pass filter cutoff on the right (feedback) input.
+; Pot 2: Micro-shift tap times: positive right, negative left
 
 ; Memory declarations
 
@@ -38,12 +39,7 @@
   EQU tap2_mul     reg9  ; Cross fade level for tap 2
   EQU tap3_mul     reg10 ; Cross fade level for tap 3
   EQU tap4_mul     reg11 ; Cross fade level for tap 4
-  EQU lpf          reg13 ; Low pass on right input
-  EQU lpf_freq     reg14 ; Low pass cutoff set by pot2
-  EQU pot0_filt    reg15 ; Filter for pot0
-  EQU pot0_fast    reg16 ; Faster resolving pot0 value
-  EQU pot1_filt    reg17 ; Filter for pot1
-  EQU pot1_fast    reg18 ; Faster resolving pot1 value
+  EQU micro_time   reg12 ; Micro-shift times
 
 ; Init program
 
@@ -59,31 +55,34 @@ loop:
 
 set_new_time_l:
 
-  RDAX pot0, 1.0          ; Load
-  RDFX pot0_filt,  0.001  ; Speed the pot up
-  WRHX pot0_filt, -0.75
-  RDAX pot0_fast,  0.75
-  WRAX pot0_fast,  1.00
-
-  SOF  0.95, 0.05         ; Scale to the space of del1
+  LDAX pot0               ; Load
+  SOF  0.75, 0.15         ; Constrain to powers of 2 times
+  LOG	 1.999, 0.0
+  AND  %11111100_00000000_00000000
+  EXP	 1.999, 0.0
   WRAX new_time_l, 1.0    ; Store
 
-  SOF  -0.9327, 0.9817    ; Scale so 1 period of lfo == delay time
+  SOF  -0.2, 0.9817       ; Scale
   WRAX SIN0_RATE, 0.0     ; Write
 
 set_new_time_r:
 
-  RDAX pot1, 1.0          ; Load
-  RDFX pot1_filt,  0.001  ; Speed the pot up
-  WRHX pot1_filt, -0.75
-  RDAX pot1_fast,  0.75
-  WRAX pot1_fast,  1.00
-
-  SOF  0.95, 0.05         ; Scale to the space of del1
+  LDAX pot1               ; Load
+  SOF  0.75, 0.15         ; Constrain to powers of 2 times
+  LOG	 1.999, 0.0
+  AND  %11111100_00000000_00000000
+  EXP	 1.999, 0.0
   WRAX new_time_r, 1.0    ; Store
 
-  SOF  -0.9327, 0.9817    ; Scale so 1 period of lfo == delay time
+  SOF  -0.2, 0.9817       ; Scale
   WRAX SIN1_RATE, 0.0     ; Scale lfo1 rate
+
+set_micro_time:
+
+  LDAX pot2                 ; Load pot2
+  SOF 0.01, 0.0             ; Scale
+  RDAX micro_time, 0.0001   ; Smooth
+  WRAX micro_time, 0.0
 
 calc_lfo0_xfade:
 
@@ -150,6 +149,7 @@ read_tap_1:
 
   OR   full_scale          ; Load ACC with 0x7FFF00
   MULX tap_time1           ; Scale by the tap position
+  RDAX micro_time, 1.0     ; Positive shift by micro time
   WRAX addr_ptr, 0         ; Set addr_ptr register for tap time
   RMPA 1.0                 ; Read delay memory
   MULX tap1_mul            ; Scale amplitude for xfade curve
@@ -159,6 +159,7 @@ read_tap_2:
 
   OR   full_scale          ; Load ACC with 0x7FFF00
   MULX tap_time2           ; Scale by the tap position
+  RDAX micro_time, 1.0     ; Positive shift by micro time
   WRAX addr_ptr, 0         ; Set addr_ptr register for tap time
   RMPA 1.0                 ; Read delay memory
   MULX tap2_mul            ; Scale amplitude for xfade curve
@@ -168,6 +169,7 @@ read_tap_3:
 
   OR   full_scale          ; Load ACC with 0x7FFF00
   MULX tap_time3           ; Scale by the tap position
+  RDAX micro_time, -1.0    ; Negative shift by micro time
   WRAX addr_ptr, 0         ; Set addr_ptr register for tap time
   RMPA 1.0                 ; Read delay memory
   MULX tap3_mul            ; Scale amplitude for xfade curve
@@ -177,6 +179,7 @@ read_tap_4:
 
   OR   full_scale          ; Load ACC with 0x7FFF00
   MULX tap_time4           ; Scale by the tap position
+  RDAX micro_time, -1.0    ; Negative shift by micro time
   WRAX addr_ptr, 0         ; Set addr_ptr register for tap time
   RMPA 1.0                 ; Read delay memory
   MULX tap4_mul            ; Scale amplitude for xfade curve
@@ -194,20 +197,10 @@ combine_right_output:
   RDA  tap4,  1.0
   WRAX dacr,  0.0          ; Write to dac right output
 
-calc_lpf_freq:
-
-  RDAX pot2, 1.0           ; Load pot2
-  MULX pot2                ; Square it
-  SOF 0.5, 0.0             ; Scale
-  WRAX lpf_freq, 0.0       ; Write
-
 ; Input
 
-  RDAX adcr, 1.0           ; Read right input
-  RDAX lpf, -1.0
-  MULX lpf_freq            ; Sweep lpf cutoff by pot2
-  RDAX lpf, 1.0
-  WRAX lpf, 1.0            ; Leave it in the ACC
+sum_inputs_to_delay:
 
+  RDAX adcr, 1.0           ; Read right input
   RDAX adcl, 1.0           ; Add left input
   WRA del1, 0.0            ; Write to delay memory

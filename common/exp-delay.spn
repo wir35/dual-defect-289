@@ -1,0 +1,90 @@
+; Long delay program
+; Summed mono input with separately adjustable left and right taps.
+
+; There is no digital feedback in this program.
+; Unity gain through the delay line.
+; The two taps can be modulated.
+; The delay time is constrained to powers of 2 from 256-32768 samples
+
+; Controls:
+; Pot 0: Left tap time
+; Pot 1: Right tap time
+; Pot 2: Micro shift left and right tap times.
+
+; Use all the delay memory for one delay line
+
+  MEM del1 32767
+
+; Constants
+
+  EQU full_scale   32767 * 256 ; 0x7FFF00
+  EQU make_up_gain -1.414      ; 2x
+  EQU input_gain   0.5
+
+  EQU bits_3  %01110000_00000000_00000000
+  EQU k_1_64k 1 / 65536
+
+; Registers and intermediate nodes
+
+  EQU scaled_pot0      reg1  ;  Left pre-delay control
+  EQU scaled_pot1      reg2  ;  Right pre-delay control
+  EQU scaled_pot2      reg3  ;  Right pre-delay control
+  EQU lpf              reg4  ;  Input low pass
+
+; Init program
+
+  SKP	run, loop
+  WLDR rmp0, 0, 4096        ; Ramp for servo pre-delay left
+  WLDR rmp1, 0, 4096        ; Ramp for servo pre-delay right
+
+loop:
+
+; Left tap time set by pot0
+  LDAX pot0                 ; Load pot0
+  SOF  0.75, 0.15
+  LOG	 1.999, 0
+  AND  %11111100_00000000_00000000
+  EXP	 1.999, 0
+  WRAX scaled_pot0, 0.0     ; Save scaled pot
+
+; Right tap time by pot1
+  LDAX pot1                 ; Load pot1
+  SOF  0.75, 0.15
+  LOG	 1.999, 0
+  AND  %11111100_00000000_00000000
+  EXP	 1.999, 0
+  WRAX scaled_pot1, 0.0     ; Save scaled pot
+
+; Fine time set by pot2
+  LDAX pot2                 ; Load pot2
+  SOF 0.01, 0.0             ; Scale
+  RDAX scaled_pot2, 0.0001  ; Smooth
+  WRAX scaled_pot2, 0.0     ; Save it, clear ACC
+
+; Inputs
+
+  RDAX adcl, input_gain
+  RDAX adcr, input_gain
+  WRA del1, 0.0
+
+; Left output, delay tap time swept by pot 0
+
+  OR   full_scale          ; Load ACC with 0x7FFF00
+  MULX scaled_pot0         ; Scale by the smoothed pot0 value
+  RDAX scaled_pot2, 1.0
+  WRAX addr_ptr, 0         ; Set addr_ptr register for tap time
+	RMPA 1.0                 ; Read delay memory
+  SOF make_up_gain, 0.0    ; Scale for make-up gain
+  SOF make_up_gain, 0.0
+  WRAX dacl, 0.0           ; Write to dac left output
+
+; Right output, delay tap time swept by pot 1
+
+  OR   full_scale
+  MULX scaled_pot1
+  RDAX scaled_pot2, -1.0
+  WRAX addr_ptr, 0
+  RMPA 1.0
+  SOF make_up_gain, 0.0
+  SOF make_up_gain, 0.0
+  WRAX dacr, 0.0
