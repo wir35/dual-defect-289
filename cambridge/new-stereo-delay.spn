@@ -3,7 +3,7 @@
 
 ; There is no digital feedback in this program.
 ; Use analog feedback on either side.
-; Low pass filter only both inputs.
+; Low pass filter on both inputs.
 ; Unity gain through the delay line.
 ; The two taps can be modulated, and the delay time changes without artifacts.
 

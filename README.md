@@ -36,14 +36,14 @@ differently in each program to achieve different effects.
 
 | D | # | Program       |  Description  |
 |---|---|---------------|---------------|
-| 1 | 7 | Long Delay    |  Mono 1s delay. Summed mono input. Separate left and right taps. |
+| 1 | 7 | New Delay     |  Mono 1s delay. Summed mono input. Separate left and right taps. |
 | 2 | 3 | Long Chorus   |  Mono 1s delay. Summed mono input. Chorus on both taps.  |
 | 3 | 5 | Stereo Delay   |  Stereo 500ms delay.  |
 | 4 | 1 | Dimension             | Stereo multi-chorus.      |
 | 5 | 6 | Reflections (Small)   | Stereo early reflections, small space.   |
 | 6 | 2 | Reflections (Medium)  | Stereo early reflections, medium space.  |
 | 7 | 4 | Reflections (Large)   | Stereo early reflections, large space.   |
-| 8 | 0 | Mobius Verb   | Mono reverb. Left is signal, right is feedback.  |
+| 8 | 0 | Width    | Stereo reverb with size and width controls.  |
 
 ### Boston Programs
 
@@ -53,14 +53,14 @@ be modulated in each.
 
 | D | # |Program       |  Description  |
 |---|---|------------|---------------|
-| 1 | 7 | Long Delay        | Mono 1s delay. Summed mono input. Separate left and right taps. |
+| 1 | 7 | New Delay        | Mono 1s delay. Summed mono input. Separate left and right taps. |
 | 2 | 3 | Darkness (medium) | Stereo reverb with variable input low pass filters. |
 | 3 | 5 | Darkness (large)  | Stereo reverb with variable input low pass filters. |
 | 4 | 1 | Distance (large)  | Stereo reverb with variable distance from source.   |
 | 5 | 6 | Chorus   (medium) | Stereo reverb with variable chorus modulation.      |
 | 6 | 2 | Time     (medium) | Stereo reverb with variable delay size/time.        |
 | 7 | 4 | Time     (large)  | Stereo reverb with variable delay size/time.        |
-| 8 | 0 | Mobius Verb       | Mono reverb. Left is signal, right is feedback.     |
+| 8 | 0 | Width      | Stereo reverb with size and width controls.     |
 
 ### Cambridge-Boston Cooperative Patches
 
@@ -76,9 +76,8 @@ together. Here are a few ideas:
     below, also blended again. A large number of flexible, naturalistic reverbs
     are possible this way.
 
-3. The Mobius Verb is the last program in both sets. Try it as a stereo reverb,
-   using each section for left and right individually. The right output is
-   feedback that can be cross-patched between the two sections.
+3. The Width reverb is the last program in both sets. It might be useful for
+   those that need two identical reverbs for quadraphonic output.
 
 ### Waltham Programs
 

@@ -1,0 +1,265 @@
+; Ambience-style reverb inspired by the "Closed Waveguide Networks" topology.
+; 8x8 FDN with allpasses in each delay and with coefficient modulation.
+; Stereo in - stereo out.
+
+; Variation: Width
+; Controls:
+; Pot 0: Reverb decay time
+; Pot 1: Stereo width
+; Pot 2: Room size
+
+; Inspired by JOS "Closed Waveguide Networks" paper, a la the famous screverb.
+; https://ccrma.stanford.edu/papers/new-approach-digital-reverberation-using-closed-waveguide-networks
+; Improvements:
+; - Added some predelay and left/right early reflections.
+; - All-pass diffusers are added in 4 of the 8 delay lines for more diffusion.
+; - The all-pass coefficients are modulated by the lfos.
+; - An additional delay line is added after the FDN, and some delay is
+;   used to decorrelate the left and right outputs.
+; - The feedback gains in two long delay lines is separately adjustable,
+;   which provides a crude "size" control.
+; - Bass boost instead of bass cut!
+; - Damping spaced throughout the delay lines and in the junction.
+
+; Memory declarations
+
+  MEM del1 1597
+  MEM del2 1489
+  MEM del3 2279
+  MEM del4 2384
+  MEM del5 3133
+  MEM del6 2951
+  MEM del7 6817
+  MEM del8 6359
+
+  MEM ap1 919
+  MEM ap2 613
+  MEM ap3 401
+  MEM ap4 739
+
+  MEM postdelay 2048
+
+; Registers
+
+  EQU temp_acc  reg0 ; Temporary accumulator
+  EQU junction  reg2 ; Sum at waveguide junction
+  EQU lfog1     reg3 ; Modulated all-pass gain coefficient 1
+  EQU lfog2     reg4 ; Modulated all-pass gain coefficient 2
+
+  EQU lpf1 reg5 ; Low pass filters in the delay lines
+  EQU lpf2 reg6
+  EQU lpf5 reg7
+  EQU lpf6 reg8
+  EQU lpf7 reg9
+  EQU lpf8 reg10
+
+  EQU damping_hi reg11 ; High shelf damping at the scattering junction
+  EQU damping_lo reg12 ; Low shelf damping at the scattering junction
+  EQU bass_boost reg13 ; Bass boost on the reverb output
+
+; Constants
+
+  EQU f_50Hz  0.01
+  EQU f_300Hz 0.055923
+  EQU	f_1kHz	0.174549
+  EQU	f_2kHz	0.318630
+  EQU	f_4kHz	0.535735
+  EQU	f_8kHz  0.784458
+  EQU	f_12kHz 0.899931
+
+  EQU rt_pot    pot0  ; Reverb time control
+  EQU width_pot pot1  ; Stereo width control
+  EQU size_pot  pot2  ; Room size control
+
+loop:
+
+  ; No lfo setup needed
+
+pots:
+
+  LDAX width_pot        ; Read the width pot
+  SOF 0.7, 0.3
+  WRAX SIN0_RANGE, 1.0  ; Scale the lfo modulation with width
+  WRAX SIN1_RANGE, 0.0
+
+lfos:
+
+  CHO RDAL, sin0    ; Read sin0 lfo
+  SOF 0.35, 0.5     ; Scale it to 0.15 - 0.85
+  WRAX lfog1, 1.0   ; Write the modulating gain coeff
+  CHO RDAL, sin1    ; Read the sin1 lfo
+  SOF 0.35, 0.5     ; Scale it to 0.15 - 0.85
+  WRAX lfog2, 0.5   ; Write the 2nd gain coeff
+
+randomness:
+
+; This section randomly samples lower bits from the reverb output
+; and applies them to modulate the two lfo frequencies randomly.
+
+  RDA postdelay + 10, 1.0
+  AND %00010111_10101011_00000000
+  RDAX SIN0_RATE, 0.01
+  WRAX SIN0_RATE, 0.0
+  RDA postdelay + 2000, 1.0
+  AND %00010011_01101011_00000000
+  RDAX SIN1_RATE, 0.01
+  WRAX SIN1_RATE, 0.0
+
+compute_junction:
+
+; This section computes the scattering junction, the point where the eight
+; waveguides combine, and writes it to the postdelay buffer.
+
+  RDA  del1#, 0.25          ; Sum the output of all 8 delay lines
+  RDA  del2#, 0.25
+  RDA  del3#, 0.25
+  RDA  del4#, 0.25
+  RDA  del5#, 0.25
+  RDA  del6#, 0.25
+  RDA  del7#, 0.25
+  RDA  del8#, 0.25
+
+  RDAX damping_hi,  f_2kHz  ; Apply some high frequency damping
+  WRHX damping_hi, -0.1
+  RDAX damping_lo,  f_50Hz  ; Apply low frequency damping
+  WRLX damping_lo, -0.2
+  WRAX junction, 1.0        ; Write the junction result
+
+  RDFX bass_boost, f_300Hz  ; Apply bass boost
+  WRLX bass_boost, 1.0
+  WRA  postdelay, 0.0       ; Write to post delay
+
+delay1:
+
+  RDA  del1#, -1.0     ; Read the end of del1
+  RDAX junction, 1.0   ; Add the "reflected" energy from the junction
+  MULX rt_pot          ; Energy loss for reverb time control
+  RDAX adcl, 0.25      ; Add the left input signal
+
+  WRAX temp_acc, 0.0   ; Save input to all-pass diffuser ap1
+  RDA  ap1#, -1.0      ; Read the end of ap1, flip sign
+  MULX lfog1           ; Multiply by (negative) gain coeff
+  RDAX temp_acc, 1.0   ; Add input
+  WRA  ap1, 1.0        ; Write to start of ap1
+  MULX lfog1           ; Multiply by (positive) gain coeff
+  RDA  ap1#, 1.0       ; Add the output of ap1
+
+  RDFX lpf1, f_12kHz   ; Low pass at 12k
+  WRAX lpf1, 1.0       ;
+  WRA  del1, 0.0       ; Write to delay 1
+
+delay2:
+
+  RDA  del2#, -1.0     ; Same
+  RDAX junction, 1.0
+  MULX rt_pot
+  RDAX adcr, 0.25      ; Add the right channel input
+
+  WRAX temp_acc, 0.0
+  RDA  ap2#, -1.0
+  MULX lfog2
+  RDAX temp_acc, 1.0
+  WRA  ap2, 1.0
+  MULX lfog2
+  RDA  ap2#, 1.0
+
+  RDFX lpf2, f_12kHz
+  WRAX lpf2, 1.0
+  WRA  del2, 0.0
+
+delay3:
+
+  RDA  del3#, -1.0     ; Same as above pair, but no lpfs
+  RDAX junction, 1.0
+  MULX rt_pot
+  RDAX adcl, 0.25
+
+  WRAX temp_acc, 0.0
+  RDA  ap3#, -1.0
+  MULX lfog2
+  RDAX temp_acc, 1.0
+  WRA  ap3, 1.0
+  MULX lfog2
+  RDA  ap3#, 1.0
+
+  WRA  del3, 0.0
+
+delay4:
+
+  RDA  del4#, -1.0      ; Same as above
+  RDAX junction, 1.0
+  MULX rt_pot
+  RDAX adcr, 0.25
+
+  WRAX temp_acc, 0.0
+  RDA  ap4#, -1.0
+  MULX lfog1
+  RDAX temp_acc, 1.0
+  WRA  ap4, 1.0
+  MULX lfog1
+  RDA  ap4#, 1.0
+
+  WRA  del4, 0.0
+
+delay5:
+
+  RDA  del5#, -1.0     ; Read the end of delay 5
+  RDAX junction, 1.0   ; Add the "reflected" energy from the junction
+  MULX rt_pot          ; Energy loss for reverb time control
+  RDAX adcl, 0.25      ; Add the left input signal
+
+  RDFX lpf5, f_8kHz    ; Low pass at 8k
+  WRAX lpf5, 1.0       ;
+  WRA  del5, 0.0       ; Write to delay 5
+
+delay6:
+
+  RDA  del6#, -1.0     ; Same as above
+  RDAX junction, 1.0
+  MULX rt_pot
+  RDAX adcr, 0.25
+
+  RDFX lpf6, f_8kHz
+  WRAX lpf6, 1.0
+  WRA  del6, 0.0
+
+delay7:
+
+  RDA  del7#, -1.0     ; Read the end of delay 5
+  RDAX junction, 1.0   ; Add the "reflected" energy from the junction
+  MULX rt_pot          ; Energy loss for reverb time control
+  RDAX adcl, 0.25      ; Add the left input signal
+  MULX size_pot        ; Additional energy loss scaled by size control
+  WRA  del7, 0.0       ; Write to delay 7
+
+delay8:
+
+  RDA  del8#, -1.0     ; Same as above
+  RDAX junction, 1.0
+  MULX rt_pot
+  RDAX adcr, 0.25
+  MULX size_pot
+  WRA  del8, 0.0
+
+output:
+
+  ; When width is 0, only the summed reverb output is heard.
+  ; When width is high, the two sides are more decorrelated
+  ; and additional early reflections are audible.
+  ; All of these values can be scaled down for less predelay.
+
+  RDA  del5 + 2347, -1.0      ; Read the two long left delays
+  RDA  del7 + 1234, -1.0      ; Prescaled by size control
+  MULX width_pot              ; Scale amplitude by the width pot
+  RDA  postdelay + 234, 1.0   ; Add the main reverb output
+  SOF  -2, 0.0                ; Make up gain
+  SOF  -2, 0.0
+  WRAX dacl, 0.0              ; Write to left output dac
+
+  RDA  del6 + 2534, -1.0      ; Read the two long right delays
+  RDA  del8 + 1435, -1.0      ; Prescaled by size control
+  MULX width_pot              ; Scale amplitude by the width pot
+  RDA  postdelay + 123, 1.0   ; Add the main reverb output
+  SOF  -2, 0.0                ; Make up gain
+  SOF  -2, 0.0
+  WRAX dacr, 0.0              ; Write to left output dac

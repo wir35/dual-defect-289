@@ -2,11 +2,12 @@
 
 Controls correspond to the panel legend on the 289.
 
-#### 01 Long Delay
+#### 01 New Delay
 
-Simple 1 second mono delay with two output taps. Use the right input
-for feedback, as it includes a low pass filter. Consider patching an output
-to a filter and back to the right input for feedback.
+A 1 second mono delay with two output taps. The tap times are quantized to
+icnreasing powers of two, to facilitate rhythmic effects. Use the time base
+knob to fine tune the delay times. The Z control introduces a micro shift between
+the two taps for wider stereo effects.
 
 | Control | Usage |
 |-------|------------------------------------
@@ -14,7 +15,7 @@ to a filter and back to the right input for feedback.
 | Outs  | Left is tap 1. Right is tap 2. |
 | X     | Tap 1 time. |
 | Y     | Tap 2 time. |
-| Z     | Low pass filter cutoff on right input. |
+| Z     | Tap 1 and 2 microshift time. |
 | Time  | Extends delay time. Reduces bandwidth. |
 | Regen | Use regen knobs to get echo feedback from 1 or 2. |
 | Bal   | Mix dry and wet signals. |
@@ -34,10 +35,9 @@ The Long Delay patch with added chorus on both taps. The LFO is a random wobble.
 | Regen | Use regen knobs to get echo feedback from 1 or 2. |
 | Bal   | Mix dry and wet signals. |
 
-#### 03 Stereo Delay
+#### 03 New Stereo Delay
 
-Simple stereo delay up to 500ms with left and right times both adjustable.
-Includes a low pass filter on both channels.
+Like New Delay, but includes a low pass filter on both channels.
 
 | Control | Usage |
 |-------|------------------------------------
@@ -114,37 +114,35 @@ blend with the original signal and then cascade it to the reverbs in the lower s
 | Regen | Not recommended. Use X. |
 | Bal   | Mix dry and wet signals. |
 
-#### 08 Mobius Reverb
+#### 08 Width
 
-A mono reverb adjustable from short to infinite reverb time. This patch is available
-on both sections, so it's possible to use two instances as a stereo reverb. Offset
-their time base controls a little so they are decorrelated.
-
-This program also allows you to make your own reverb "feedback loop" by cross-patching
-the feedback outputs (right side) through analog effects and into each other's
-feedback inputs. Use the Z knobs to keep the feedback under control. Try using
-filters, equalizers, phasers, frequency shifters, limiters, gates, etc in the loop
-for special effects.
+A very usable ambience style reverb, which can be used to add stereo width
+and ambience to any source. Stereo input and stereo output. The Y control adjusts
+the perceived width, adding early reflections and presenting a more
+decorrelated stereo field. The Z control adjusts the perceived size of the room.
+While extreme settings of X and Z together produce a long tail, this one is
+optimized for shorter ambiences.
 
 | Control | Usage |
 |-------|------------------------------------
-| Ins   | Left: signal in. Right: feedback in. |
-| Outs  | Left: reverb signal out. Right: feedback signal out. |
-| X     | Reverb time. |
-| Y     | Predelay time. |
-| Z     | Feedback output level. |
+| Ins   | Stereo input. |
+| Outs  | Stereo output. |
+| X     | Reverb decay time. |
+| Y     | Stero width and modulation. |
+| Z     | Room size. |
 | Time  | Increases size. Decreases bandwidth. |
-| Regen | Not recommended on left. Right maybe. |
-| Bal   | Mix dry and wet signal on left side. Right at 100% if using feedback. |
+| Regen | Not recommended. Use X. |
+| Bal   | Mix dry and wet signals. |
 
 
 ## Boston
 
-#### 01 Long Delay
+#### 01 New Delay
 
-Simple 1 second mono delay with two output taps. Use the right input
-for feedback, as it includes a low pass filter. Consider patching an output
-to a filter and back to the right input for feedback.
+A 1 second mono delay with two output taps. The tap times are quantized to
+icnreasing powers of two, to facilitate rhythmic effects. Use the time base
+knob to fine tune the delay times. The Z control introduces a micro shift between
+the two taps for wider stereo effects.
 
 | Control | Usage |
 |-------|------------------------------------
@@ -152,7 +150,7 @@ to a filter and back to the right input for feedback.
 | Outs  | Left is tap 1. Right is tap 2. |
 | X     | Tap 1 time. |
 | Y     | Tap 2 time. |
-| Z     | Low pass filter cutoff on right input. |
+| Z     | Tap 1 and 2 microshift time. |
 | Time  | Extends delay time. Reduces bandwidth. |
 | Regen | Use regen knobs to get echo feedback from 1 or 2. |
 | Bal   | Mix dry and wet signals. |
@@ -264,28 +262,25 @@ deranged warble into the reverb network.
 | Bal   | Blend dry and wet signals if desired. |
 
 
-#### 08 Mobius Reverb
+#### 08 Width
 
-A mono reverb adjustable from short to infinite reverb time. This patch is available
-on both sections, so it's possible to use two instances as a stereo reverb. Offset
-their time base controls a little so they are decorrelated.
-
-This program also allows you to make your own reverb "feedback loop" by cross-patching
-the feedback outputs (right side) through analog effects and into each other's
-feedback inputs. Use the Z knobs to keep the feedback under control. Try using
-filters, equalizers, phasers, frequency shifters, limiters, gates, etc in the loop
-for special effects.
+A very usable ambience style reverb, which can be used to add stereo width
+and ambience to any source. Stereo input and stereo output. The Y control adjusts
+the perceived width, adding early reflections and presenting a more
+decorrelated stereo field. The Z control adjusts the perceived size of the room.
+While extreme settings of X and Z together produce a long tail, this one is
+optimized for shorter ambiences.
 
 | Control | Usage |
 |-------|------------------------------------
-| Ins   | Left: signal in. Right: feedback in. |
-| Outs  | Left: reverb signal out. Right: feedback signal out. |
-| X     | Reverb time. |
-| Y     | Predelay time. |
-| Z     | Feedback output level. |
+| Ins   | Stereo input. |
+| Outs  | Stereo output. |
+| X     | Reverb decay time. |
+| Y     | Stero width and modulation. |
+| Z     | Room size. |
 | Time  | Increases size. Decreases bandwidth. |
-| Regen | Not recommended on left. Right maybe. |
-| Bal   | Mix dry and wet signal on left side. Right at 100% if using feedback. |
+| Regen | Not recommended. Use X. |
+| Bal   | Mix dry and wet signals. |
 
 
 ## Waltham
